@@ -470,14 +470,13 @@ class SupervisedRunner(BaseRunner):
 
             total_samples += len(loss)
             epoch_loss += batch_loss  # add total loss of batch
-
         epoch_loss = epoch_loss / total_samples  # average loss per element for whole epoch
         self.epoch_metrics['epoch'] = epoch_num
         self.epoch_metrics['loss'] = epoch_loss
 
         if self.classification:
             predictions = torch.from_numpy(np.concatenate(per_batch['predictions'], axis=0))
-            probs = torch.nn.functional.softmax(predictions, dim=1)  # (total_samples, num_classes) est. prob. for each class and sample
+            probs = torch.nn.functional.softmax(predictions)  # (total_samples, num_classes) est. prob. for each class and sample
             predictions = torch.argmax(probs, dim=1).cpu().numpy()  # (total_samples,) int class index for each sample
             probs = probs.cpu().numpy()
             targets = np.concatenate(per_batch['targets'], axis=0).flatten()
@@ -486,16 +485,18 @@ class SupervisedRunner(BaseRunner):
 
             self.epoch_metrics['accuracy'] = metrics_dict['total_accuracy']  # same as average recall over all classes
             self.epoch_metrics['precision'] = metrics_dict['prec_avg']  # average precision over all classes
-            global training_accuracies
-            training_accuracies.append(self.epoch_metrics['accuracy'])
 
             if self.model.num_classes == 2:
+                # Add the new binary classification metrics
+                self.epoch_metrics['sensitivity'] = metrics_dict['sensitivity']
+                self.epoch_metrics['specificity'] = metrics_dict['specificity']
+                self.epoch_metrics['youden_index'] = metrics_dict['youden_index']
+                
                 false_pos_rate, true_pos_rate, _ = sklearn.metrics.roc_curve(targets, probs[:, 1])  # 1D scores needed
                 self.epoch_metrics['AUROC'] = sklearn.metrics.auc(false_pos_rate, true_pos_rate)
 
                 prec, rec, _ = sklearn.metrics.precision_recall_curve(targets, probs[:, 1])
                 self.epoch_metrics['AUPRC'] = sklearn.metrics.auc(rec, prec)
-
         if keep_all:
             return self.epoch_metrics, per_batch
         else:

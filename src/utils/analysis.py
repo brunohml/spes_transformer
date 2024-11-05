@@ -416,7 +416,6 @@ class Analyzer(object):
                 Could also be integers [0, 1, ..., num_classes-1].
             excluded_classes: list of classes to be excluded from average precision, recall calculation (e.g. OTHER)
         """
-
         # Trim class_names to include only classes existing in y_pred OR y_true
         in_pred_labels = set(list(y_pred))
         in_true_labels = set(list(y_true))
@@ -424,7 +423,7 @@ class Analyzer(object):
         self.existing_class_ind = sorted(list(in_pred_labels | in_true_labels))
         class_strings = [str(name) for name in class_names]  # needed in case `class_names` elements are not strings
         self.existing_class_names = [class_strings[ind][:min(self.maxcharlength, len(class_strings[ind]))] for ind in
-                                     self.existing_class_ind]  # a little inefficient but inconsequential
+                                    self.existing_class_ind]
 
         # Confusion matrix
         ConfMatrix = metrics.confusion_matrix(y_true, y_pred)
@@ -441,13 +440,12 @@ class Analyzer(object):
 
         if self.print_conf_mat:
             print_confusion_matrix(self.ConfMatrix_normalized_row, label_strings=self.existing_class_names,
-                                   title='Confusion matrix normalized by row')
+                                title='Confusion matrix normalized by row')
             print('\n')
         if self.plot:
             plt.figure()
             plot_confusion_matrix(self.ConfMatrix_normalized_row, label_strings=self.existing_class_names,
-                                  title='Confusion matrix normalized by row')
-
+                                title='Confusion matrix normalized by row')
             plt.show(block=False)
 
         # Analyze results
@@ -456,13 +454,41 @@ class Analyzer(object):
 
         # returns metrics for each class, in the same order as existing_class_names
         self.precision, self.recall, self.f1, self.support = metrics.precision_recall_fscore_support(y_true, y_pred,
-                                                                                                     labels=self.existing_class_ind)
+                                                                                                    labels=self.existing_class_ind)
+
+        # Calculate sensitivity, specificity and Youden index for binary classification
+        metrics_dict = {
+            "total_accuracy": self.total_accuracy,
+            "precision": self.precision,
+            "recall": self.recall,
+            "f1": self.f1,
+            "support": self.support,
+            "prec_avg": None,
+            "rec_avg": None
+        }
+
+        if len(self.existing_class_names) == 2:
+            tn, fp, fn, tp = ConfMatrix.ravel()
+            sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+            specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+            youden_index = sensitivity + specificity - 1
+            
+            metrics_dict["sensitivity"] = sensitivity
+            metrics_dict["specificity"] = specificity
+            metrics_dict["youden_index"] = youden_index
+            
+            print(f"Sensitivity: {sensitivity:.3f}")
+            print(f"Specificity: {specificity:.3f}")
+            print(f"Youden Index: {youden_index:.3f}\n")
 
         # Print report
         print(self.generate_classification_report())
 
         # Calculate average precision and recall
         self.prec_avg, self.rec_avg = self.get_avg_prec_recall(ConfMatrix, self.existing_class_names, excluded_classes)
+        metrics_dict["prec_avg"] = self.prec_avg
+        metrics_dict["rec_avg"] = self.rec_avg
+
         if excluded_classes:
             print(
                 "\nAverage PRECISION: {:.2f}\n(using class frequencies as weights, excluding classes with no predictions and predictions in '{}')".format(
@@ -474,5 +500,4 @@ class Analyzer(object):
         # Make a histogram with the distribution of classes with respect to precision and recall
         self.prec_rec_histogram(self.precision, self.recall)
 
-        return {"total_accuracy": self.total_accuracy, "precision": self.precision, "recall": self.recall,
-                "f1": self.f1, "support": self.support, "prec_avg": self.prec_avg, "rec_avg": self.rec_avg}
+        return metrics_dict
