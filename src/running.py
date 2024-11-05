@@ -10,6 +10,7 @@ from collections import OrderedDict
 import time
 import pickle
 from functools import partial
+import matplotlib.pyplot as plt
 
 import ipdb
 import torch
@@ -23,6 +24,9 @@ from datasets.dataset import ImputationDataset, TransductionDataset, Classiregre
 
 
 logger = logging.getLogger('__main__')
+
+training_accuracies = []
+validation_accuracies = []
 
 NEG_METRICS = {'loss'}  # metrics for which "better" is less
 
@@ -178,7 +182,6 @@ def evaluate(evaluator):
             print_str += '{}: {:8f} | '.format(k, v)
     logger.info(print_str)
     logger.info("Evaluation runtime: {} hours, {} minutes, {} seconds\n".format(*utils.readable_time(eval_runtime)))
-
     return aggr_metrics, per_batch
 
 
@@ -394,6 +397,7 @@ class SupervisedRunner(BaseRunner):
 
         epoch_loss = 0  # total loss of epoch
         total_samples = 0  # total samples in epoch
+        # correct_predictions = 0  # correct predictions for accuracy
 
         for i, batch in enumerate(self.dataloader):
 
@@ -473,7 +477,7 @@ class SupervisedRunner(BaseRunner):
 
         if self.classification:
             predictions = torch.from_numpy(np.concatenate(per_batch['predictions'], axis=0))
-            probs = torch.nn.functional.softmax(predictions)  # (total_samples, num_classes) est. prob. for each class and sample
+            probs = torch.nn.functional.softmax(predictions, dim=1)  # (total_samples, num_classes) est. prob. for each class and sample
             predictions = torch.argmax(probs, dim=1).cpu().numpy()  # (total_samples,) int class index for each sample
             probs = probs.cpu().numpy()
             targets = np.concatenate(per_batch['targets'], axis=0).flatten()
@@ -482,6 +486,8 @@ class SupervisedRunner(BaseRunner):
 
             self.epoch_metrics['accuracy'] = metrics_dict['total_accuracy']  # same as average recall over all classes
             self.epoch_metrics['precision'] = metrics_dict['prec_avg']  # average precision over all classes
+            global training_accuracies
+            training_accuracies.append(self.epoch_metrics['accuracy'])
 
             if self.model.num_classes == 2:
                 false_pos_rate, true_pos_rate, _ = sklearn.metrics.roc_curve(targets, probs[:, 1])  # 1D scores needed
@@ -494,3 +500,6 @@ class SupervisedRunner(BaseRunner):
             return self.epoch_metrics, per_batch
         else:
             return self.epoch_metrics
+
+
+    

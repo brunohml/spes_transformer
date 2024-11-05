@@ -135,6 +135,10 @@ class Options(object):
                                  help='Metric used for defining best epoch')
         self.parser.add_argument('--freeze', action='store_true',
                                  help='If set, freezes all layer parameters except for the output layer. Also removes dropout except before the output layer')
+        self.parser.add_argument('--early_stopping_patience', type=int, default=10,
+                        help='Number of epochs to wait before early stopping')
+        self.parser.add_argument('--early_stopping_delta', type=float, default=0,
+                        help='Minimum change in monitored quantity to qualify as an improvement')
 
         # Model
         self.parser.add_argument('--model', choices={"transformer", "LINEAR"}, default="transformer",

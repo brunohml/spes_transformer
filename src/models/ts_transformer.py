@@ -168,7 +168,7 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
         super(TransformerBatchNormEncoderLayer, self).__setstate__(state)
 
     def forward(self, src: Tensor, src_mask: Optional[Tensor] = None,
-                src_key_padding_mask: Optional[Tensor] = None) -> Tensor:
+                src_key_padding_mask: Optional[Tensor] = None, **kwargs) -> Tensor: # added **kwargs to address TypeError: forward() got unexpected kwarg "is_causal"
         r"""Pass the input through the encoder layer.
 
         Args:

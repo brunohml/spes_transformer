@@ -4,16 +4,25 @@
 *.whl
 build
 *.egg-info
+venv/
+ENV/
+.idea/
+.vscode/
+*.swp
 
 # Dataset
 *.npz
+classification_datasets/
+classification_datasets/**
 
 # Models
 *.pth
 *.pickle
+experiments/
 
 # Compiled python
 *.pyc
+__pycache__/
 
 # Jupyter
 *.ipynb
@@ -28,5 +37,3 @@ _build
 
 # Logs
 logs
-
-.idea

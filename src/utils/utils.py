@@ -341,3 +341,65 @@ def compute_loss(net: torch.nn.Module,
             running_loss += loss_function(y, netout)
 
     return running_loss / len(dataloader)
+
+
+def plot_metrics(output_dir, metrics_dict):
+    """Create training/validation metric plots."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    # Plot losses
+    plt.figure(figsize=(10,6))
+    
+    # Get epochs array for x-axis
+    epochs = np.arange(1, len(metrics_dict['train_loss']) + 1)
+    
+    # Plot training loss
+    plt.plot(epochs, metrics_dict['train_loss'], label='Training Loss', color='blue')
+    
+    # Convert validation data to numpy arrays for easier handling
+    val_epochs = np.arange(1, len(metrics_dict['val_loss']) + 1)
+    val_losses = np.array(metrics_dict['val_loss'])
+    
+    # Plot validation loss directly since we know we have valid data
+    plt.plot(val_epochs, val_losses, 
+            label='Validation Loss', 
+            color='red',
+            marker='o',
+            linestyle='--',
+            markersize=6)
+    
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training and Validation Loss')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(os.path.join(output_dir, 'loss_plot.png'))
+    plt.close()
+
+    # Plot accuracies if they exist
+    if ('train_accuracy' in metrics_dict and len(metrics_dict['train_accuracy']) > 0 and 
+        'val_accuracy' in metrics_dict and len(metrics_dict['val_accuracy']) > 0):
+        plt.figure(figsize=(10,6))
+        
+        # Plot training accuracy
+        plt.plot(epochs, metrics_dict['train_accuracy'], 
+                label='Training Accuracy', 
+                color='blue')
+        
+        # Plot validation accuracy
+        val_accuracy = np.array(metrics_dict['val_accuracy'])
+        plt.plot(val_epochs, val_accuracy, 
+                label='Validation Accuracy', 
+                color='red',
+                marker='o',
+                linestyle='--',
+                markersize=6)
+        
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.title('Training and Validation Accuracy')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(os.path.join(output_dir, 'accuracy_plot.png'))
+        plt.close()

@@ -17,6 +17,8 @@ import sys
 import time
 import pickle
 import json
+import matplotlib as plt
+import numpy as np
 
 # 3rd party packages
 from tqdm import tqdm
@@ -28,14 +30,22 @@ from torch.utils.tensorboard import SummaryWriter
 from options import Options
 from running import setup, pipeline_factory, validate, check_progress, NEG_METRICS
 from utils import utils
+from utils.early_stopping import EarlyStopping
 from datasets.data import data_factory, Normalizer
 from datasets.datasplit import split_dataset
 from models.ts_transformer import model_factory
 from models.loss import get_loss_module
 from optimizers import get_optimizer
 
-
 def main(config):
+
+    # Initialize dictionary to store metrics for plotting
+    metrics_dict = {
+        'train_loss': [],      # Store training loss for each epoch
+        'val_loss': [],        # Store validation loss for each epoch
+        'train_accuracy': [],  # Store training accuracy (if applicable)
+        'val_accuracy': []     # Store validation accuracy (if applicable)
+    }
 
     total_epoch_time = 0
     total_eval_time = 0
@@ -237,6 +247,15 @@ def main(config):
     metrics_names, metrics_values = zip(*aggr_metrics_val.items())
     metrics.append(list(metrics_values))
 
+    # Initialize early stopping
+    early_stopping = EarlyStopping(
+        patience=config['early_stopping_patience'],
+        val_interval=config['val_interval'], 
+        verbose=True,
+        delta=config['early_stopping_delta'],
+        path=os.path.join(config['save_dir'], 'early_stopping_checkpoint.pt')
+    )
+
     logger.info('Starting training...')
     for epoch in tqdm(range(start_epoch + 1, config["epochs"] + 1), desc='Training Epoch', leave=False):
         mark = epoch if config['save_all'] else 'last'
@@ -265,6 +284,26 @@ def main(config):
             metrics_names, metrics_values = zip(*aggr_metrics_val.items())
             metrics.append(list(metrics_values))
 
+            # Check early stopping conditions
+            early_stopping(aggr_metrics_val['loss'], model)
+            if early_stopping.early_stop:
+                logger.info("Early stopping triggered")
+                print()
+                break
+
+            # Store validation metrics for plotting
+            metrics_dict['val_loss'].append(aggr_metrics_val['loss'])
+
+            # Store validation accuracy for plotting if it's a classification task
+            if 'accuracy' in aggr_metrics_val:
+                metrics_dict['val_accuracy'].append(aggr_metrics_val['accuracy'])
+                
+        else:
+            # For epochs where we don't validate, append NaN
+            metrics_dict['val_loss'].append(float('nan'))
+            if 'accuracy' in aggr_metrics_val:
+                metrics_dict['val_accuracy'].append(float('nan'))
+
         utils.save_model(os.path.join(config['save_dir'], 'model_{}.pth'.format(mark)), epoch, model, optimizer)
 
         # Learning rate scheduling
@@ -282,6 +321,13 @@ def main(config):
             train_loader.dataset.update()
             val_loader.dataset.update()
 
+        # Store training metrics after each epoch for plotting
+        metrics_dict['train_loss'].append(aggr_metrics_train['loss'])
+
+        # Store accuracy for plotting if it's a classification task
+        if 'accuracy' in aggr_metrics_train:
+            metrics_dict['train_accuracy'].append(aggr_metrics_train['accuracy'])
+
     # Export evolution of metrics over epochs
     header = metrics_names
     metrics_filepath = os.path.join(config["output_dir"], "metrics_" + config["experiment_name"] + ".xls")
@@ -297,8 +343,10 @@ def main(config):
     total_runtime = time.time() - total_start_time
     logger.info("Total runtime: {} hours, {} minutes, {} seconds\n".format(*utils.readable_time(total_runtime)))
 
-    return best_value
+    # Generate and save the plots
+    utils.plot_metrics(config['output_dir'], metrics_dict)
 
+    return best_value
 
 if __name__ == '__main__':
 
