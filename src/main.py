@@ -333,6 +333,7 @@ def main(config):
     metrics_filepath = os.path.join(config["output_dir"], "metrics_" + config["experiment_name"] + ".xls")
     book = utils.export_performance_metrics(metrics_filepath, metrics, header, sheet_name="metrics")
 
+
     # Export record metrics to a file accumulating records from all experiments
     utils.register_record(config["records_file"], config["initial_timestamp"], config["experiment_name"],
                           best_metrics, aggr_metrics_val, comment=config['comment'])
