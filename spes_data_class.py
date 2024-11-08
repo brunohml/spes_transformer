@@ -12,206 +12,208 @@ from src.datasets.data import BaseData
 class SPESData(BaseData):
     """
     Dataset class for SPES (Single Pulse Electrical Stimulation) dataset.
-    Includes functionality for handling SOZ (Seizure Onset Zone) labels.
+    
+    Attributes:
+        all_df: dataframe indexed by integer indices, with multiple rows corresponding to the same index (sample).
+            Each row is a time step; Each column contains a feature (channel).
+        feature_df: same as all_df (all columns are features)
+        feature_names: names of columns contained in feature_df
+        all_IDs: unique integer indices contained in all_df
+        labels_df: dataframe containing SOZ labels for each trial
+        metadata_df: dataframe containing additional information (stim_pair, patient_id)
     """
-    def __init__(self, root_dir: str, n_electrodes: int = 36):
+    def __init__(self, root_dir: str, test_patient_id: str, n_electrodes: int = 36):
         """
-        Initialize the SPES dataset.
+        Initialize the SPES dataset with training/test split by patient.
         
         Args:
-            root_dir (str): Directory containing SPES pickle files
+            root_dir (str): Root directory containing patient subfolders
+            test_patient_id (str): Patient ID to use for test set (e.g., 'Epat26')
             n_electrodes (int): Number of electrodes to select per trial
         """
-        # Set sampling rate and sequence length constants
-        self.sampling_rate = 512  # Sampling frequency in Hz
-        self.seq_len = 487       # Number of time points per sequence
-        self.n_electrodes = n_electrodes  # Number of electrodes to select per trial
+        self.sampling_rate = 512
+        self.seq_len = 487
+        self.n_electrodes = n_electrodes
+        self.test_patient_id = test_patient_id
         
-        # Initialize dictionaries to store metadata
-        self.trial_electrodes = {}     # Maps trial_id to list of selected electrodes
-        self.trial_stim_channels = {}  # Maps trial_id to stimulation channel
-        self.trial_soz_labels = {}     # NEW: Maps trial_id to SOZ label
+        # Initialize metadata dictionaries
+        self.trial_electrodes = {}
+        self.trial_stim_channels = {}
+        self.trial_soz_labels = {}
         
-        # Load all data and create main dataframe
-        self.all_df = self._load_all_data(root_dir)
-        # Extract unique trial IDs from the multi-index
-        self.all_IDs = self.all_df.index.get_level_values(0).unique()
+        # Load training and test data separately
+        self.train_df, self.train_labels, train_metadata = self._load_patient_data(
+            root_dir, exclude_patient=test_patient_id)
+        self.test_df, self.test_labels, test_metadata = self._load_patient_data(
+            root_dir, test_patient=test_patient_id)
         
-        # Set feature dataframe (same as all_df in this case)
-        self.feature_df = self.all_df
-        # Get list of column names (channel names)
-        self.feature_names = self.all_df.columns.tolist()
+        # Set main dataframes (using training set as default)
+        self.all_df = self.train_df
+        self.labels_df = self.train_labels
+        self.metadata_df = train_metadata
+        self.all_IDs = self.train_df.index.unique()
+        self.feature_df = self.train_df
+        self.feature_names = self.train_df.columns.tolist()
+        
+        # Store test set information
+        self.test_IDs = self.test_df.index.unique()
 
-    def _load_all_data(self, root_dir: str) -> pd.DataFrame:
+    def _load_patient_data(self, root_dir: str, exclude_patient: str = None, 
+                          test_patient: str = None) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Load all pickle files and create combined dataframe with SOZ labels.
+        Load data for specified patients.
         
         Args:
-            root_dir (str): Directory containing SPES pickle files
-            
-        Returns:
-            pd.DataFrame: Combined DataFrame with trial data and SOZ labels
+            root_dir (str): Root directory containing patient subfolders
+            exclude_patient (str): Patient ID to exclude (for training set)
+            test_patient (str): Patient ID to include (for test set)
         """
-        # Load SOZ labels from metadata
+        # Load SOZ labels
         try:
             soz_df = pd.read_csv(os.path.join('spes_trial_metadata', 'labels_SOZ.csv'))
             print(f"Loaded SOZ labels for {len(soz_df)} electrodes")
-            print("\nFirst few rows of SOZ labels:")
-            print(soz_df.head())
-            print("\nUnique patients:", sorted(soz_df['Pt'].unique()))
-            print("Sample leads:", sorted(soz_df['Lead'].unique())[:5])
         except Exception as e:
             raise ValueError(f"Error loading SOZ labels: {str(e)}")
         
-        all_trials = []      # List to store DataFrames for each trial
-        trial_counter = 0    # Counter to generate unique trial IDs
+        all_trials = []
+        all_labels = []
+        metadata_dict = {'trial_id': [], 'stim_pair': [], 'patient_id': []}
+        trial_counter = 0
         
-        # Check if directory exists
-        if not os.path.exists(root_dir):
-            raise ValueError(f"Directory not found: {root_dir}")
+        # Get patient directories and count total pickle files
+        patient_dirs = [d for d in os.listdir(root_dir) 
+                       if os.path.isdir(os.path.join(root_dir, d))]
         
-        # Get list of pickle files
-        pickle_files = glob.glob(os.path.join(root_dir, "*.pickle"))
-        if not pickle_files:
-            raise ValueError(f"No pickle files found in {root_dir}")
+        total_pickles = 0
+        for patient_dir in patient_dirs:
+            patient_id = patient_dir.replace('patient_', '')
+            if (exclude_patient and patient_id == exclude_patient) or \
+               (test_patient and patient_id != test_patient):
+                continue
+            pickle_files = glob.glob(os.path.join(root_dir, patient_dir, "*.pickle"))
+            total_pickles += len(pickle_files)
         
-        print(f"Found {len(pickle_files)} pickle files")  # Debug print
+        # Print dataset split information
+        if test_patient:
+            print(f"\nProcessing test set for patient: {test_patient}")
+        else:
+            print(f"\nProcessing training set (excluding patient: {exclude_patient})")
+        print(f"Total pickle files to process: {total_pickles}")
         
-        for filepath in pickle_files:
-            print(f"\nProcessing file: {os.path.basename(filepath)}")  # Debug print
+        processed_pickles = 0
+        milestone = total_pickles // 5  # 20% intervals
+        
+        for patient_dir in patient_dirs:
+            patient_id = patient_dir.replace('patient_', '')
             
-            # Load pickle file contents
-            try:
-                with open(filepath, 'rb') as f:
-                    trial_data = pickle.load(f)
-                print(f"Type of loaded data: {type(trial_data)}")
-                print(f"Length of loaded data: {len(trial_data)}")
-                
-                if isinstance(trial_data, list):
-                    # Print types without showing full arrays
-                    type_info = [f"{type(item).__name__}{item.shape if isinstance(item, np.ndarray) else ''}" 
-                               for item in trial_data]
-                    print(f"Data elements: {type_info}")
-                    
-                    # Assuming first array is response matrix and third is channel names
-                    response_matrix = trial_data[0]
-                    available_channels = trial_data[2]
-                    
-                    # Convert available_channels to list if it's a numpy array
-                    if isinstance(available_channels, np.ndarray):
-                        available_channels = available_channels.tolist()
-                    
-                    print(f"Response matrix shape: {response_matrix.shape}")
-                    
-                else:
-                    response_matrix = trial_data['normalized_seeg']
-                    available_channels = trial_data['chan']
-                    print(f"Response matrix shape: {response_matrix.shape}")
-                
-            except Exception as e:
-                print(f"Error loading {filepath}: {str(e)}")
+            # Skip or include based on patient ID
+            if exclude_patient and patient_id == exclude_patient:
+                continue
+            if test_patient and patient_id != test_patient:
                 continue
                 
-            # Parse filename to extract metadata
-            filename = os.path.basename(filepath)
-            try:
-                # Split on underscores and handle the special case of electrode pairs
-                parts = filename.replace('.pickle', '').split('_')
-                patient_id = parts[0]  # e.g., 'Epat26'
-                stim_pair = parts[1]   # e.g., 'LAC5-LAC6'
-                
-                # First, handle channel selection
-                if len(available_channels) < self.n_electrodes:
-                    print(f"Warning: Not enough channels in {filename}. Skipping...")
-                    continue
+            patient_path = os.path.join(root_dir, patient_dir)
+            pickle_files = glob.glob(os.path.join(patient_path, "*.pickle"))
+            
+            for filepath in pickle_files:
+                try:
+                    # Load and process pickle file
+                    with open(filepath, 'rb') as f:
+                        trial_data = pickle.load(f)
                     
-                selected_channels = random.sample(list(available_channels), self.n_electrodes)
-                channel_indices = [list(available_channels).index(ch) for ch in selected_channels]
-                selected_data = response_matrix[channel_indices, :].T
-                
-                # Then, look up SOZ label using the full bipolar pair
-                soz_match = soz_df[(soz_df['Pt'] == patient_id) & 
-                                 (soz_df['Lead'] == stim_pair)]
-                
-                if len(soz_match) == 0:
-                    print(f"Warning: No SOZ label found for patient {patient_id}, electrode pair {stim_pair}")
-                    # Debug print to help understand the matching issue
-                    matching_patient = soz_df[soz_df['Pt'] == patient_id]
-                    if not matching_patient.empty:
-                        print(f"Available electrode pairs for {patient_id}:")
-                        print(matching_patient['Lead'].unique()[:5], "...")  # Show first 5 pairs
-                    soz_label = 0  # Default to non-SOZ if not found
-                else:
-                    soz_label = int(soz_match.iloc[0]['SOZ'])  # Ensure integer type
-                    print(f"Found SOZ label {soz_label} for {patient_id}, {stim_pair}")
-                
-                # Create trial ID and store metadata
-                trial_id = f"trial_{trial_counter}"
-                self.trial_soz_labels[trial_id] = soz_label
-                self.trial_electrodes[trial_id] = selected_channels
-                self.trial_stim_channels[trial_id] = stim_pair
-                
-                # Create DataFrame with 3-level MultiIndex
-                trial_df = pd.DataFrame(
-                    selected_data,
-                    columns=[f"channel_{i}" for i in range(self.n_electrodes)],
-                    index=pd.MultiIndex.from_product(
-                        [[trial_id], [soz_label], range(self.seq_len)],
-                        names=['trial_id', 'soz', 'timestep']
+                    # Extract response matrix and channel names
+                    if isinstance(trial_data, list):
+                        response_matrix = trial_data[0]
+                        available_channels = trial_data[2]
+                        if isinstance(available_channels, np.ndarray):
+                            available_channels = available_channels.tolist()
+                    else:
+                        response_matrix = trial_data['normalized_seeg']
+                        available_channels = trial_data['chan']
+                    
+                    # Parse filename
+                    parts = os.path.basename(filepath).replace('.pickle', '').split('_')
+                    stim_pair = parts[1]
+                    
+                    # Channel selection
+                    if len(available_channels) < self.n_electrodes:
+                        print(f"Warning: Not enough channels in {filepath}. Skipping...")
+                        continue
+                    
+                    selected_channels = random.sample(list(available_channels), self.n_electrodes)
+                    channel_indices = [list(available_channels).index(ch) for ch in selected_channels]
+                    selected_data = response_matrix[channel_indices, :].T
+                    
+                    # SOZ label lookup
+                    soz_match = soz_df[(soz_df['Pt'] == patient_id) & 
+                                       (soz_df['Lead'] == stim_pair)]
+                    
+                    soz_label = int(soz_match.iloc[0]['SOZ']) if len(soz_match) > 0 else 0
+                    
+                    # Store metadata
+                    trial_id = f"trial_{trial_counter}"
+                    metadata_dict['trial_id'].append(trial_id)
+                    metadata_dict['stim_pair'].append(stim_pair)
+                    metadata_dict['patient_id'].append(patient_id)
+                    
+                    # Create DataFrames with integer index
+                    trial_df = pd.DataFrame(
+                        selected_data,
+                        columns=[f"channel_{i}" for i in range(self.n_electrodes)]
                     )
-                )
-                
-                all_trials.append(trial_df)
-                trial_counter += 1
-                
-            except Exception as e:
-                print(f"Error processing {filename}: {str(e)}")
-                continue
+                    trial_df.index = pd.Series([trial_counter] * self.seq_len)
+                    
+                    # Create labels DataFrame
+                    label_df = pd.DataFrame({
+                        'soz': [soz_label]
+                    }, index=[trial_counter])
+                    
+                    all_trials.append(trial_df)
+                    all_labels.append(label_df)
+                    trial_counter += 1
+                    
+                    processed_pickles += 1
+                    # Print progress at 20% intervals
+                    if milestone > 0 and processed_pickles % milestone == 0:
+                        progress = (processed_pickles / total_pickles) * 100
+                        print(f"Progress: {processed_pickles}/{total_pickles} files ({progress:.0f}% complete)")
+                    
+                except Exception as e:
+                    print(f"Error processing file {os.path.basename(filepath)}: {str(e)}")
+                    continue
         
         if not all_trials:
-            raise ValueError("No valid trials were processed")
-            
-        return pd.concat(all_trials)
+            raise ValueError(f"No valid trials processed for {'test' if test_patient else 'training'} set")
+        
+        print(f"\nFinished processing {processed_pickles} files")
+        print(f"Created {len(all_trials)} valid trials")
+        
+        # Combine all data
+        all_df = pd.concat(all_trials)
+        labels_df = pd.concat(all_labels)
+        metadata_df = pd.DataFrame(metadata_dict)
+        metadata_df.set_index('trial_id', inplace=True)
+        
+        return all_df, labels_df, metadata_df
 
-    # NEW: Methods for querying SOZ-related information
-    def get_soz_trials(self) -> pd.DataFrame:
-        """
-        Get all trials where stimulation was in SOZ.
-        
-        Returns:
-            pd.DataFrame: DataFrame containing only SOZ trials
-        """
-        return self.all_df.xs(1, level='soz')
+    @property
+    def feature_dim(self):
+        """Return feature dimensionality"""
+        return self.feature_df.shape[1]
+
+    @property
+    def labels(self):
+        """Return flattened labels for classification"""
+        return self.labels_df['soz'].values
+
+    def get_test_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Get test set data and labels"""
+        return self.test_df, self.test_labels
     
-    def get_non_soz_trials(self) -> pd.DataFrame:
-        """
-        Get all trials where stimulation was not in SOZ.
-        
-        Returns:
-            pd.DataFrame: DataFrame containing only non-SOZ trials
-        """
-        return self.all_df.xs(0, level='soz')
+    def get_train_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Get training set data and labels"""
+        return self.train_df, self.train_labels
     
-    def get_trial_soz_label(self, trial_id: str) -> int:
-        """
-        Get SOZ label for a specific trial.
-        
-        Args:
-            trial_id (str): Trial identifier
-            
-        Returns:
-            int: SOZ label (0 or 1)
-        """
-        if trial_id not in self.trial_soz_labels:
-            raise ValueError(f"Trial {trial_id} not found")
-        return self.trial_soz_labels[trial_id]
-    
-    def print_soz_summary(self):
-        """
-        Print summary of SOZ labels in the dataset.
-        """
-        soz_counts = pd.Series(self.trial_soz_labels).value_counts()
-        print("\nSOZ Label Summary:")
-        print(f"SOZ trials (1): {soz_counts.get(1, 0)}")
-        print(f"Non-SOZ trials (0): {soz_counts.get(0, 0)}")
-        print(f"Total trials: {len(self.trial_soz_labels)}")
+    def get_metadata(self, trial_id: str) -> Dict[str, str]:
+        """Get metadata for a specific trial"""
+        return self.metadata_df.loc[trial_id].to_dict()
