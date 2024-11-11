@@ -357,17 +357,20 @@ def plot_metrics(output_dir, metrics_dict):
     # Plot training loss
     plt.plot(epochs, metrics_dict['train_loss'], label='Training Loss', color='blue')
     
-    # Convert validation data to numpy arrays for easier handling
-    val_epochs = np.arange(1, len(metrics_dict['val_loss']) + 1)
+    # Convert validation losses to numpy array and mask invalid values
     val_losses = np.array(metrics_dict['val_loss'])
+    mask = ~np.isnan(val_losses) if isinstance(val_losses[0], float) else [x is not None for x in val_losses]
+    valid_epochs = epochs[mask]
+    valid_losses = val_losses[mask]
     
-    # Plot validation loss directly since we know we have valid data
-    plt.plot(val_epochs, val_losses, 
-            label='Validation Loss', 
-            color='red',
-            marker='o',
-            linestyle='--',
-            markersize=6)
+    # Plot validation loss only if we have valid points
+    if len(valid_epochs) > 0:
+        plt.plot(valid_epochs, valid_losses, 
+                label='Validation Loss', 
+                color='red',
+                marker='o',
+                linestyle='--',
+                markersize=6)
     
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
@@ -377,8 +380,8 @@ def plot_metrics(output_dir, metrics_dict):
     plt.savefig(os.path.join(output_dir, 'loss_plot.png'))
     plt.close()
 
-    # Plot accuracies if they exist
-    if ('train_accuracy' in metrics_dict and len(metrics_dict['train_accuracy']) > 0 and 
+    # Plot accuracies only if both training and validation accuracies exist and have data
+    if ('train_accuracy' in metrics_dict and len(metrics_dict['train_accuracy']) > 0 and
         'val_accuracy' in metrics_dict and len(metrics_dict['val_accuracy']) > 0):
         plt.figure(figsize=(10,6))
         
@@ -387,14 +390,19 @@ def plot_metrics(output_dir, metrics_dict):
                 label='Training Accuracy', 
                 color='blue')
         
-        # Plot validation accuracy
-        val_accuracy = np.array(metrics_dict['val_accuracy'])
-        plt.plot(val_epochs, val_accuracy, 
-                label='Validation Accuracy', 
-                color='red',
-                marker='o',
-                linestyle='--',
-                markersize=6)
+        # Handle validation accuracy similarly to validation loss
+        val_accs = np.array(metrics_dict['val_accuracy'])
+        mask = ~np.isnan(val_accs) if isinstance(val_accs[0], float) else [x is not None for x in val_accs]
+        valid_epochs = epochs[mask]
+        valid_accs = val_accs[mask]
+        
+        if len(valid_epochs) > 0:
+            plt.plot(valid_epochs, valid_accs, 
+                    label='Validation Accuracy', 
+                    color='red',
+                    marker='o',
+                    linestyle='--',
+                    markersize=6)
         
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
@@ -403,3 +411,11 @@ def plot_metrics(output_dir, metrics_dict):
         plt.grid(True)
         plt.savefig(os.path.join(output_dir, 'accuracy_plot.png'))
         plt.close()
+
+
+def calculate_epoch_balance(batch_labels):
+    """Calculate SOZ ratio from a list of batch labels"""
+    labels = torch.cat(batch_labels)
+    n_soz = (labels == 1).sum().item()
+    total = len(labels)
+    return n_soz / total if total > 0 else 0

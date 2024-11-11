@@ -23,7 +23,7 @@ import numpy as np
 # 3rd party packages
 from tqdm import tqdm
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 # Project modules
@@ -36,6 +36,8 @@ from datasets.datasplit import split_dataset
 from models.ts_transformer import model_factory
 from models.loss import get_loss_module
 from optimizers import get_optimizer
+from utils.sampler import create_balanced_sampler
+from utils.utils import calculate_epoch_balance
 
 def main(config):
 
@@ -167,13 +169,17 @@ def main(config):
 
     # Initialize optimizer
 
-    if config['global_reg']:
-        weight_decay = config['l2_reg']
+    # Set up L2 regularization
+    if config.get('global_reg', False):
+        # Apply L2 reg through optimizer's weight decay
+        weight_decay = float(config.get('l2_reg', 0))
         output_reg = None
     else:
+        # Apply L2 reg in loss calculation
         weight_decay = 0
-        output_reg = config['l2_reg']
+        output_reg = torch.tensor(float(config.get('l2_reg', 0)), device=device)
 
+    # Create optimizer with appropriate weight decay
     optim_class = get_optimizer(config['optimizer'])
     optimizer = optim_class(model.parameters(), lr=config['lr'], weight_decay=weight_decay)
 
@@ -213,22 +219,40 @@ def main(config):
     # Initialize data generators
     dataset_class, collate_fn, runner_class = pipeline_factory(config)
     val_dataset = dataset_class(val_data, val_indices)
-
-    val_loader = DataLoader(dataset=val_dataset,
-                            batch_size=config['batch_size'],
-                            shuffle=False,
-                            num_workers=config['num_workers'],
-                            pin_memory=True,
-                            collate_fn=lambda x: collate_fn(x, max_len=model.max_len))
-
     train_dataset = dataset_class(my_data, train_indices)
 
-    train_loader = DataLoader(dataset=train_dataset,
-                              batch_size=config['batch_size'],
-                              shuffle=True,
-                              num_workers=config['num_workers'],
-                              pin_memory=True,
-                              collate_fn=lambda x: collate_fn(x, max_len=model.max_len))
+    # Create samplers if balanced sampling is enabled
+    train_sampler = None
+    if config.get('use_balanced_sampling', False):
+        weights = create_balanced_sampler(
+            train_dataset.data.labels_df['soz'].values,
+            target_ratio=config.get('target_soz_ratio', 0.5)
+        )
+        train_sampler = WeightedRandomSampler(
+            weights=weights,
+            num_samples=len(train_dataset),
+            replacement=config.get('sampling_replacement', True)
+        )
+
+    # Create data loaders
+    val_loader = DataLoader(
+        dataset=val_dataset,
+        batch_size=config['batch_size'],
+        shuffle=False,
+        num_workers=config['num_workers'],
+        pin_memory=True,
+        collate_fn=lambda x: collate_fn(x, max_len=model.max_len)
+    )
+
+    train_loader = DataLoader(
+        dataset=train_dataset,
+        batch_size=config['batch_size'],
+        sampler=train_sampler,
+        shuffle=train_sampler is None,
+        num_workers=config['num_workers'],
+        pin_memory=True,
+        collate_fn=lambda x: collate_fn(x, max_len=model.max_len)
+    )
 
     trainer = runner_class(model, train_loader, device, loss_module, optimizer, l2_reg=output_reg,
                                  print_interval=config['print_interval'], console=config['console'])
@@ -249,10 +273,10 @@ def main(config):
 
     # Initialize early stopping
     early_stopping = EarlyStopping(
-        patience=config['early_stopping_patience'],
-        val_interval=config['val_interval'], 
+        patience=int(config['early_stopping_patience']),
+        val_interval=int(config['val_interval']), 
         verbose=True,
-        delta=config['early_stopping_delta'],
+        delta=float(config['early_stopping_delta']),
         path=os.path.join(config['save_dir'], 'early_stopping_checkpoint.pt')
     )
 
@@ -288,7 +312,6 @@ def main(config):
             early_stopping(aggr_metrics_val['loss'], model)
             if early_stopping.early_stop:
                 logger.info("Early stopping triggered")
-                print()
                 break
 
             # Store validation metrics for plotting
@@ -333,7 +356,6 @@ def main(config):
     metrics_filepath = os.path.join(config["output_dir"], "metrics_" + config["experiment_name"] + ".xls")
     book = utils.export_performance_metrics(metrics_filepath, metrics, header, sheet_name="metrics")
 
-
     # Export record metrics to a file accumulating records from all experiments
     utils.register_record(config["records_file"], config["initial_timestamp"], config["experiment_name"],
                           best_metrics, aggr_metrics_val, comment=config['comment'])
@@ -345,6 +367,10 @@ def main(config):
     logger.info("Total runtime: {} hours, {} minutes, {} seconds\n".format(*utils.readable_time(total_runtime)))
 
     # Generate and save the plots
+    print("\nFinal metrics shapes:")
+    print(f"Train loss points: {len(metrics_dict['train_loss'])}")
+    print(f"Val loss points: {len(metrics_dict['val_loss'])}")
+    print(f"Validation losses: {[x for x in metrics_dict['val_loss'] if not np.isnan(x)]}")
     utils.plot_metrics(config['output_dir'], metrics_dict)
 
     return best_value

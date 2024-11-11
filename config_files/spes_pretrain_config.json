@@ -1,0 +1,42 @@
+{
+    "data_class": "spes",
+    "data_dir": "classification_datasets/SPES",
+    "output_dir": "output/spes/pretrained",
+    "records_file": "imputation_records.xls",
+    "model": "transformer",
+    "task": "imputation",
+
+
+    "batch_size": 32,
+    "max_seq_len": 487,
+    "d_model": 64,
+    "num_heads": 8,
+    "num_layers": 3,
+    "dim_feedforward": 256,
+    "dropout": 0.1,
+    "pos_encoding": "learnable",
+
+
+    "activation": "gelu",
+    "normalization": "per_sample_std",
+    "lr": 0.001,
+    "epochs": 500,
+    "optimizer": "Adam",
+    "l2_reg": 0.0,
+    "num_workers": 4,
+    "print_interval": 10,
+    "val_ratio": 0,
+    "pattern": "TRAIN",
+    "val_pattern": "TEST",
+    "early_stopping_patience": 10,
+    "early_stopping_delta": 0.01,
+
+    
+    "use_balanced_sampling": true,
+    "target_soz_ratio": 0.3,
+    "sampling_replacement": true,
+    "mask_mode": "separate",
+    "mask_distribution": "geometric",
+    "mean_mask_length": 3,
+    "masking_ratio": 0.15
+} 

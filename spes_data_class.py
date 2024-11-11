@@ -22,30 +22,42 @@ class SPESData(BaseData):
         labels_df: dataframe containing SOZ labels for each trial
         metadata_df: dataframe containing additional information (stim_pair, patient_id)
     """
-    def __init__(self, root_dir: str, test_patient_id: str, n_electrodes: int = 36):
+    def __init__(self, root_dir: str, file_list=None, n_electrodes: int = 36,
+                 pattern=None, n_proc=1, limit_size=None, config=None):
         """
         Initialize the SPES dataset with training/test split by patient.
         
         Args:
             root_dir (str): Root directory containing patient subfolders
-            test_patient_id (str): Patient ID to use for test set (e.g., 'Epat26')
+            file_list (list, optional): List containing patient ID to exclude from training (test patient)
             n_electrodes (int): Number of electrodes to select per trial
+            pattern (str, optional): File pattern to match
+            n_proc (int, optional): Number of processes for parallel processing
+            limit_size (int, optional): Limit dataset size
+            config (dict, optional): Configuration dictionary
         """
+        # Initialize BaseData attributes
+        self.config = config
+        self.set_num_processes(n_proc)
+        
+        # Initialize SPES-specific attributes
         self.sampling_rate = 512
         self.seq_len = 487
         self.n_electrodes = n_electrodes
-        self.test_patient_id = test_patient_id
         
         # Initialize metadata dictionaries
         self.trial_electrodes = {}
         self.trial_stim_channels = {}
         self.trial_soz_labels = {}
         
+        # Get test patient from file_list
+        exclude_patient = file_list[0] if file_list and len(file_list) > 0 else None
+        
         # Load training and test data separately
         self.train_df, self.train_labels, train_metadata = self._load_patient_data(
-            root_dir, exclude_patient=test_patient_id)
+            root_dir, exclude_patient=exclude_patient)
         self.test_df, self.test_labels, test_metadata = self._load_patient_data(
-            root_dir, test_patient=test_patient_id)
+            root_dir, test_patient=exclude_patient)
         
         # Set main dataframes (using training set as default)
         self.all_df = self.train_df
@@ -57,6 +69,20 @@ class SPESData(BaseData):
         
         # Store test set information
         self.test_IDs = self.test_df.index.unique()
+        
+        # Apply size limit if specified
+        if limit_size is not None:
+            if limit_size > 1:
+                limit_size = int(limit_size)
+            else:  # interpret as proportion if in (0, 1]
+                limit_size = int(limit_size * len(self.all_IDs))
+            self.all_IDs = self.all_IDs[:limit_size]
+            self.all_df = self.all_df.loc[self.all_IDs]
+            self.labels_df = self.labels_df.loc[self.all_IDs]
+
+    def load_all(self, root_dir):
+        """Load all data and return dataframes in required format for BaseData"""
+        return self.all_df, self.labels_df
 
     def _load_patient_data(self, root_dir: str, exclude_patient: str = None, 
                           test_patient: str = None) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -205,6 +231,11 @@ class SPESData(BaseData):
     def labels(self):
         """Return flattened labels for classification"""
         return self.labels_df['soz'].values
+    
+    @property
+    def class_names(self):
+        """Return class names for classification"""
+        return [0, 1]  # Binary classification (SOZ vs non-SOZ)
 
     def get_test_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Get test set data and labels"""

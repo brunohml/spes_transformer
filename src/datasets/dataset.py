@@ -1,6 +1,8 @@
 import numpy as np
 from torch.utils.data import Dataset
 import torch
+import random
+import logging
 
 
 class ImputationDataset(Dataset):
@@ -130,23 +132,112 @@ class ClassiregressionDataset(Dataset):
         self.feature_df = self.data.feature_df.loc[self.IDs]
 
         self.labels_df = self.data.labels_df.loc[self.IDs]
-
+        self._first_get = True
+        self.integrity_checks = {
+            'total_checks': 0,
+            'passed_checks': 0,
+            'failed_samples': set()
+        }
+        
+    def _verify_spes_structure(self, sample_id):
+        """Verify SPES data structure on first __getitem__ call"""
+        print(f"\nVerifying SPES data structure for sample {sample_id}...")
+        
+        # Get sample data
+        sample_data = self.feature_df.loc[sample_id]
+        
+        try:
+            # 1. Check sequence length
+            assert len(sample_data) == 487, \
+                f"❌ Expected 487 timepoints, got {len(sample_data)}"
+            print("✓ Sequence length verified: 487 timepoints")
+            
+            # 2. Check channel structure
+            channel_cols = [f"channel_{i}" for i in range(36)]
+            assert all(col in sample_data.columns for col in channel_cols), \
+                "❌ Missing expected channel columns"
+            assert len(sample_data.columns) == 36, \
+                f"❌ Expected 36 channels, got {len(sample_data.columns)}"
+            print("✓ Channel structure verified: 36 channels")
+            
+            # 3. Check data validity
+            assert not sample_data.isna().any().any(), \
+                "❌ Sample contains NaN values"
+            print("✓ Data validity verified: No NaN values")
+            
+            # 4. Check label
+            label = self.labels_df.loc[sample_id, 'soz']
+            assert label in [0, 1], \
+                f"❌ Invalid label value: {label}"
+            print("✓ Label verified: Binary classification value")
+            
+            # 5. Check index continuity
+            indices = sample_data.index.values
+            assert len(set(indices)) == 1, \
+                "❌ Multiple index values found for single sample"
+            assert indices[0] == sample_id, \
+                f"❌ Index mismatch: {indices[0]} != {sample_id}"
+            print("✓ Index continuity verified: All rows share same index")
+            
+            print("\n✓ All SPES data structure checks passed!")
+            return True
+            
+        except AssertionError as e:
+            print(f"\n{str(e)}")
+            print("\nData structure details:")
+            print(f"Shape: {sample_data.shape}")
+            print(f"Columns: {sample_data.columns.tolist()}")
+            print(f"Index values: {set(sample_data.index.values)}")
+            raise
+            
     def __getitem__(self, ind):
-        """
-        For a given integer index, returns the corresponding (seq_length, feat_dim) array and a noise mask of same shape
-        Args:
-            ind: integer index of sample in dataset
-        Returns:
-            X: (seq_length, feat_dim) tensor of the multivariate time series corresponding to a sample
-            y: (num_labels,) tensor of labels (num_labels > 1 for multi-task models) for each sample
-            ID: ID of sample
-        """
-
-        X = self.feature_df.loc[self.IDs[ind]].values  # (seq_length, feat_dim) array
-        y = self.labels_df.loc[self.IDs[ind]].values  # (num_labels,) array
-
-        return torch.from_numpy(X), torch.from_numpy(y), self.IDs[ind]
-
+        """Get a single training example"""
+        sample_id = self.IDs[ind]
+        
+        # Get features and verify structure
+        X = self.feature_df.loc[sample_id].values
+        
+        # Verify data integrity
+        if hasattr(self.data, 'sanity_check_sequence'):
+            # Run check on first batch and randomly afterwards
+            if self.integrity_checks['total_checks'] == 0 or random.random() < 0.01:
+                self.integrity_checks['total_checks'] += 1
+                try:
+                    self.data.sanity_check_sequence(sample_id)
+                    self.integrity_checks['passed_checks'] += 1
+                    
+                    # Log milestone checks
+                    if self.integrity_checks['total_checks'] % 100 == 0:
+                        logger.info(
+                            f"\nData Integrity Check Milestone:"
+                            f"\n- Total checks: {self.integrity_checks['total_checks']}"
+                            f"\n- Passed checks: {self.integrity_checks['passed_checks']}"
+                            f"\n- Failed samples: {len(self.integrity_checks['failed_samples'])}"
+                            f"\n- Pass rate: {(self.integrity_checks['passed_checks']/self.integrity_checks['total_checks'])*100:.2f}%"
+                        )
+                        
+                except AssertionError as e:
+                    self.integrity_checks['failed_samples'].add(sample_id)
+                    logger.error(
+                        f"\n{'='*50}"
+                        f"\nDATA INTEGRITY CHECK FAILED"
+                        f"\nSample ID: {sample_id}"
+                        f"\nError: {str(e)}"
+                        f"\nShape of retrieved data: {X.shape}"
+                        f"\nUnique indices in sample: {len(set(self.feature_df.loc[sample_id].index))}"
+                        f"\nTotal failed samples: {len(self.integrity_checks['failed_samples'])}"
+                        f"\n{'='*50}"
+                    )
+                    raise RuntimeError(f"Training example {sample_id} is corrupted")
+        
+        # Get label if doing classification
+        if self.labels_df is not None:
+            y = self.labels_df.loc[sample_id].values
+        else:
+            y = None
+            
+        return torch.from_numpy(X), torch.from_numpy(y) if y is not None else None, sample_id
+        
     def __len__(self):
         return len(self.IDs)
 
@@ -266,7 +357,7 @@ def noise_mask(X, masking_ratio, lm=3, mode='separate', distribution='geometric'
                                     p=(1 - masking_ratio, masking_ratio))
         else:
             mask = np.tile(np.random.choice(np.array([True, False]), size=(X.shape[0], 1), replace=True,
-                                            p=(1 - masking_ratio, masking_ratio)), X.shape[1])
+                            p=(1 - masking_ratio, masking_ratio)), X.shape[1])
 
     return mask
 
@@ -309,3 +400,40 @@ def padding_mask(lengths, max_len=None):
             .type_as(lengths)
             .repeat(batch_size, 1)
             .lt(lengths.unsqueeze(1)))
+
+
+class TimeSeriesDataset(Dataset):
+    def __init__(self, data, context_length=None, mask=None, task='classification', stride=1):
+        super(TimeSeriesDataset, self).__init__()
+
+        self.data = data
+        self.task = task
+        self.mask = mask
+        self.stride = stride
+        self.all_IDs = data.all_IDs
+        
+        # Get labels and convert to one-hot if needed
+        self.labels = data.labels
+        if task == 'classification':
+            # Check if labels need to be converted to one-hot
+            if len(self.labels.shape) == 1:
+                num_classes = len(data.class_names)
+                one_hot = np.zeros((len(self.labels), num_classes))
+                for i, label in enumerate(self.labels):
+                    one_hot[i, int(label)] = 1
+                self.labels = one_hot
+
+    def __getitem__(self, ind):
+        """Get item by index"""
+        ID = self.all_IDs[ind]
+        features = self.data.feature_df.loc[ID].values
+        label = self.labels[ind]
+        
+        if self.task == 'classification':
+            # Ensure label is a tensor of correct shape
+            label = torch.FloatTensor(label)
+            
+        return torch.FloatTensor(features), label
+
+    def __len__(self):
+        return len(self.all_IDs)

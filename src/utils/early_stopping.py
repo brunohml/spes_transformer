@@ -1,7 +1,8 @@
 import torch
+import numpy as np
 
 class EarlyStopping:
-    def __init__(self, patience=7, val_interval=1, verbose=False, delta=0, path='checkpoint.pt'):
+    def __init__(self, patience, val_interval, verbose=False, delta=0, path='checkpoint.pt'):
         """
         Args:
             patience (int): Number of validation checks to wait
@@ -10,15 +11,15 @@ class EarlyStopping:
             delta (float): Minimum required improvement in loss to be considered "better"
             path (str): Where to save the best model checkpoint
         """
-        self.patience = patience
-        self.val_interval = val_interval
-        self.epochs_patience = patience * val_interval
+        self.patience = int(patience)
+        self.val_interval = int(val_interval)
+        self.epochs_patience = self.patience * self.val_interval
         self.verbose = verbose
         self.counter = 0          # Counts epochs since last improvement
         self.best_score = None    # Best score seen so far
         self.early_stop = False   # Flag to indicate if training should stop
-        self.val_loss_min = float('inf')  # Initialize best loss as infinity
-        self.delta = delta        # Minimum improvement threshold
+        self.val_loss_min = np.Inf  # Initialize best loss as infinity
+        self.delta = float(delta)        # Minimum improvement threshold
         self.path = path          # Checkpoint save location
 
     def __call__(self, val_loss, model):
@@ -39,18 +40,20 @@ class EarlyStopping:
         # If we didn't improve enough (considering delta threshold)
         elif score < self.best_score + self.delta:
             self.counter += 1  # Increment patience counter
-        if self.verbose:
-            print(f'EarlyStopping counter: {self.counter} out of {self.patience} checks '
-                  f'({self.counter * self.val_interval} out of {self.epochs_patience} epochs)')
-            # If we've exceeded patience threshold, signal to stop training
-            if self.counter >= self.patience:
-                self.early_stop = True
         
         # If we did improve enough
         else:
             self.best_score = score  # Update best score
             self.save_checkpoint(val_loss, model)  # Save model
             self.counter = 0  # Reset patience counter
+
+        # Print status and check for early stopping after counter is updated
+        if self.verbose:
+            print(f'EarlyStopping counter: {self.counter} out of {self.patience} checks '
+                  f'({self.counter * self.val_interval} out of {self.epochs_patience} epochs)')
+        
+        if self.counter >= self.patience:
+            self.early_stop = True
 
     def save_checkpoint(self, val_loss, model):
         '''Saves model when validation loss decreases.'''

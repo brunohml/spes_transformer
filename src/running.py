@@ -10,7 +10,6 @@ from collections import OrderedDict
 import time
 import pickle
 from functools import partial
-import matplotlib.pyplot as plt
 
 import ipdb
 import torch
@@ -18,15 +17,15 @@ from torch.utils.data import DataLoader
 import numpy as np
 import sklearn
 
-from utils import utils, analysis
+from utils import utils
+from utils.analysis import Analyzer
 from models.loss import l2_reg_loss
 from datasets.dataset import ImputationDataset, TransductionDataset, ClassiregressionDataset, collate_unsuperv, collate_superv
+from utils.sampler import create_balanced_sampler
+from utils.utils import calculate_epoch_balance
 
 
 logger = logging.getLogger('__main__')
-
-training_accuracies = []
-validation_accuracies = []
 
 NEG_METRICS = {'loss'}  # metrics for which "better" is less
 
@@ -34,23 +33,29 @@ val_times = {"total_time": 0, "count": 0}
 
 
 def pipeline_factory(config):
-    """For the task specified in the configuration returns the corresponding combination of
-    Dataset class, collate function and Runner class."""
-
+    """Returns the corresponding combination of Dataset class, collate function and Runner class."""
+    
     task = config['task']
-
+    
+    # Set up dataset class and collate function based on task
     if task == "imputation":
-        return partial(ImputationDataset, mean_mask_length=config['mean_mask_length'],
-                       masking_ratio=config['masking_ratio'], mode=config['mask_mode'],
-                       distribution=config['mask_distribution'], exclude_feats=config['exclude_feats']),\
-                        collate_unsuperv, UnsupervisedRunner
-    if task == "transduction":
-        return partial(TransductionDataset, mask_feats=config['mask_feats'],
-                       start_hint=config['start_hint'], end_hint=config['end_hint']), collate_unsuperv, UnsupervisedRunner
-    if (task == "classification") or (task == "regression"):
-        return ClassiregressionDataset, collate_superv, SupervisedRunner
+        dataset_class = partial(ImputationDataset, 
+                              mean_mask_length=config.get('mean_mask_length', 10),
+                              masking_ratio=config.get('masking_ratio', 0.15),
+                              mode=config.get('mask_mode', 'random'),
+                              distribution=config.get('mask_distribution', 'geometric'),
+                              exclude_feats=config.get('exclude_feats', None))
+        collate_fn = collate_unsuperv
+        runner_class = UnsupervisedRunner
+    elif (task == "classification") or (task == "regression"):
+        dataset_class = ClassiregressionDataset
+        collate_fn = collate_superv
+        runner_class = SupervisedRunner
     else:
-        raise NotImplementedError("Task '{}' not implemented".format(task))
+        raise NotImplementedError(f"Task '{task}' not implemented")
+
+    # Return the raw components - let main.py handle DataLoader creation
+    return dataset_class, collate_fn, runner_class
 
 
 def setup(args):
@@ -182,6 +187,7 @@ def evaluate(evaluator):
             print_str += '{}: {:8f} | '.format(k, v)
     logger.info(print_str)
     logger.info("Evaluation runtime: {} hours, {} minutes, {} seconds\n".format(*utils.readable_time(eval_runtime)))
+
     return aggr_metrics, per_batch
 
 
@@ -248,6 +254,7 @@ class BaseRunner(object):
         self.l2_reg = l2_reg
         self.print_interval = print_interval
         self.printer = utils.Printer(console=console)
+        self.last_batch_logged = -1  # Track last logged batch to avoid duplicates
 
         self.epoch_metrics = OrderedDict()
 
@@ -255,71 +262,157 @@ class BaseRunner(object):
         raise NotImplementedError('Please override in child class')
 
     def evaluate(self, epoch_num=None, keep_all=True):
-        raise NotImplementedError('Please override in child class')
+        self.model = self.model.eval()
+        epoch_loss = 0
+        epoch_recon_acc = 0
+        total_active_elements = 0
+
+        if keep_all:
+            per_batch = {'target_masks': [], 'targets': [], 'predictions': [], 'metrics': [], 'IDs': []}
+        
+        for i, batch in enumerate(self.dataloader):
+            X, targets, target_masks, padding_masks, IDs = batch
+            targets = targets.to(self.device)
+            target_masks = target_masks.to(self.device)
+            padding_masks = padding_masks.to(self.device)
+
+            predictions = self.model(X.to(self.device), padding_masks)
+            target_masks = target_masks * padding_masks.unsqueeze(-1)
+            
+            # Calculate MSE loss
+            loss = self.loss_module(predictions, targets, target_masks)
+            batch_loss = torch.sum(loss).cpu().item()
+            mean_loss = batch_loss / len(loss)
+
+            # Calculate reconstruction accuracy
+            with torch.no_grad():
+                masked_pred = torch.masked_select(predictions, target_masks)
+                masked_true = torch.masked_select(targets, target_masks)
+                recon_acc = torch.mean((torch.abs(masked_pred - masked_true) < 0.2).float())
+
+            if keep_all:
+                per_batch['target_masks'].append(target_masks.cpu().numpy())
+                per_batch['targets'].append(targets.cpu().numpy())
+                per_batch['predictions'].append(predictions.cpu().numpy())
+                per_batch['metrics'].append([loss.cpu().numpy()])
+                per_batch['IDs'].append(IDs)
+
+            metrics = {
+                "loss": mean_loss,
+                "recon_acc": recon_acc.item()
+            }
+            
+            if i % self.print_interval == 0:
+                ending = "" if epoch_num is None else 'Epoch {} '.format(epoch_num)
+                self.print_callback(i, metrics, prefix='Evaluating ' + ending)
+
+            total_active_elements += len(loss)
+            epoch_loss += batch_loss
+            epoch_recon_acc += recon_acc.item() * len(loss)
+
+        epoch_loss = epoch_loss / total_active_elements
+        epoch_recon_acc = epoch_recon_acc / total_active_elements
+        self.epoch_metrics['epoch'] = epoch_num
+        self.epoch_metrics['loss'] = epoch_loss
+        self.epoch_metrics['recon_acc'] = epoch_recon_acc
+
+        if keep_all:
+            return self.epoch_metrics, per_batch
+        else:
+            return self.epoch_metrics
 
     def print_callback(self, i_batch, metrics, prefix=''):
-
+        """Print training progress at specified intervals"""
         total_batches = len(self.dataloader)
+        
+        # Only print first and last batch, and every 50th batch
+        should_print = (
+            i_batch == 0 or  # First batch
+            i_batch == total_batches - 1 or  # Last batch
+            i_batch % 50 == 0  # Every 50th batch
+        )
+        
+        if should_print:
+            template = "{:5.1f}% | batch: {:9d} of {:9d}"
+            content = [100 * (i_batch / total_batches), i_batch, total_batches]
+            for met_name, met_value in metrics.items():
+                template += "\t|\t{}".format(met_name) + ": {:g}"
+                content.append(met_value)
 
-        template = "{:5.1f}% | batch: {:9d} of {:9d}"
-        content = [100 * (i_batch / total_batches), i_batch, total_batches]
-        for met_name, met_value in metrics.items():
-            template += "\t|\t{}".format(met_name) + ": {:g}"
-            content.append(met_value)
-
-        dyn_string = template.format(*content)
-        dyn_string = prefix + dyn_string
-        self.printer.print(dyn_string)
+            dyn_string = template.format(*content)
+            dyn_string = prefix + dyn_string
+            self.printer.print(dyn_string)
 
 
 class UnsupervisedRunner(BaseRunner):
 
     def train_epoch(self, epoch_num=None):
-
         self.model = self.model.train()
-
-        epoch_loss = 0  # total loss of epoch
-        total_active_elements = 0  # total unmasked elements in epoch
+        epoch_loss = 0  
+        epoch_recon_acc = 0
+        total_active_elements = 0
+        epoch_labels = []
+        
         for i, batch in enumerate(self.dataloader):
-
             X, targets, target_masks, padding_masks, IDs = batch
+            if hasattr(self.dataloader.dataset.data, 'labels_df'):
+                batch_labels = self.dataloader.dataset.data.labels_df.loc[IDs]['soz'].values
+                epoch_labels.append(torch.tensor(batch_labels))
+            
             targets = targets.to(self.device)
-            target_masks = target_masks.to(self.device)  # 1s: mask and predict, 0s: unaffected input (ignore)
-            padding_masks = padding_masks.to(self.device)  # 0s: ignore
+            target_masks = target_masks.to(self.device)
+            padding_masks = padding_masks.to(self.device)
 
-            predictions = self.model(X.to(self.device), padding_masks)  # (batch_size, padded_length, feat_dim)
-
-            # Cascade noise masks (batch_size, padded_length, feat_dim) and padding masks (batch_size, padded_length)
+            predictions = self.model(X.to(self.device), padding_masks)
             target_masks = target_masks * padding_masks.unsqueeze(-1)
-            loss = self.loss_module(predictions, targets, target_masks)  # (num_active,) individual loss (square error per element) for each active value in batch
+            
+            # Calculate MSE loss as before
+            loss = self.loss_module(predictions, targets, target_masks)
             batch_loss = torch.sum(loss)
-            mean_loss = batch_loss / len(loss)  # mean loss (over active elements) used for optimization
+            mean_loss = batch_loss / len(loss)
 
-            if self.l2_reg:
-                total_loss = mean_loss + self.l2_reg * l2_reg_loss(self.model)
+            # Calculate reconstruction accuracy
+            with torch.no_grad():
+                masked_pred = torch.masked_select(predictions, target_masks)
+                masked_true = torch.masked_select(targets, target_masks)
+                recon_acc = torch.mean((torch.abs(masked_pred - masked_true) < 0.2).float())
+
+            if self.l2_reg is not None:
+                l2_term = l2_reg_loss(self.model)
+                total_loss = mean_loss + self.l2_reg * l2_term
             else:
                 total_loss = mean_loss
 
-            # Zero gradients, perform a backward pass, and update the weights.
             self.optimizer.zero_grad()
             total_loss.backward()
-
-            # torch.nn.utils.clip_grad_value_(self.model.parameters(), clip_value=1.0)
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=4.0)
             self.optimizer.step()
 
-            metrics = {"loss": mean_loss.item()}
+            metrics = {
+                "loss": mean_loss.item(),
+                "recon_acc": recon_acc.item()
+            }
+            
             if i % self.print_interval == 0:
-                ending = "" if epoch_num is None else 'Epoch {} '.format(epoch_num)
+                ending = "" if epoch_num is None else f'Epoch {epoch_num} '
                 self.print_callback(i, metrics, prefix='Training ' + ending)
 
             with torch.no_grad():
                 total_active_elements += len(loss)
-                epoch_loss += batch_loss.item()  # add total loss of batch
+                epoch_loss += batch_loss.item()
+                epoch_recon_acc += recon_acc.item() * len(loss)
 
-        epoch_loss = epoch_loss / total_active_elements  # average loss per element for whole epoch
+        epoch_loss = epoch_loss / total_active_elements
+        epoch_recon_acc = epoch_recon_acc / total_active_elements
         self.epoch_metrics['epoch'] = epoch_num
         self.epoch_metrics['loss'] = epoch_loss
+        self.epoch_metrics['recon_acc'] = epoch_recon_acc
+
+        if epoch_labels:
+            epoch_balance = calculate_epoch_balance(epoch_labels)
+            logger.info(f"Epoch {epoch_num} SOZ sampling ratio: {epoch_balance:.2%}")
+            self.epoch_metrics['soz_ratio'] = epoch_balance
+        
         return self.epoch_metrics
 
     def evaluate(self, epoch_num=None, keep_all=True):
@@ -381,15 +474,13 @@ class UnsupervisedRunner(BaseRunner):
 
 class SupervisedRunner(BaseRunner):
 
-    def __init__(self, *args, **kwargs):
-
-        super(SupervisedRunner, self).__init__(*args, **kwargs)
-
-        if isinstance(args[3], torch.nn.CrossEntropyLoss):
-            self.classification = True  # True if classification, False if regression
-            self.analyzer = analysis.Analyzer(print_conf_mat=True)
-        else:
-            self.classification = False
+    def __init__(self, model, dataloader, device, loss_module, optimizer=None, l2_reg=None, print_interval=10, console=True):
+        super().__init__(model, dataloader, device, loss_module, print_interval, console)
+        self.optimizer = optimizer
+        self.l2_reg = l2_reg
+        self.epoch_metrics = {}
+        self.classification = hasattr(model, 'num_classes')  # Check if model is for classification
+        self.analyzer = Analyzer(print_conf_mat=True) if self.classification else Analyzer()
 
     def train_epoch(self, epoch_num=None):
 
@@ -397,11 +488,12 @@ class SupervisedRunner(BaseRunner):
 
         epoch_loss = 0  # total loss of epoch
         total_samples = 0  # total samples in epoch
-        # correct_predictions = 0  # correct predictions for accuracy
-
+        epoch_labels = []
+        
         for i, batch in enumerate(self.dataloader):
-
             X, targets, padding_masks, IDs = batch
+            epoch_labels.append(targets)
+            
             targets = targets.to(self.device)
             padding_masks = padding_masks.to(self.device)  # 0s: ignore
             # regression: (batch_size, num_labels); classification: (batch_size, num_classes) of logits
@@ -411,8 +503,9 @@ class SupervisedRunner(BaseRunner):
             batch_loss = torch.sum(loss)
             mean_loss = batch_loss / len(loss)  # mean loss (over samples) used for optimization
 
-            if self.l2_reg:
-                total_loss = mean_loss + self.l2_reg * l2_reg_loss(self.model)
+            if self.l2_reg is not None:
+                l2_term = l2_reg_loss(self.model)
+                total_loss = mean_loss + self.l2_reg * l2_term
             else:
                 total_loss = mean_loss
 
@@ -426,7 +519,7 @@ class SupervisedRunner(BaseRunner):
 
             metrics = {"loss": mean_loss.item()}
             if i % self.print_interval == 0:
-                ending = "" if epoch_num is None else 'Epoch {} '.format(epoch_num)
+                ending = "" if epoch_num is None else f'Epoch {epoch_num} '
                 self.print_callback(i, metrics, prefix='Training ' + ending)
 
             with torch.no_grad():
@@ -436,71 +529,66 @@ class SupervisedRunner(BaseRunner):
         epoch_loss = epoch_loss / total_samples  # average loss per sample for whole epoch
         self.epoch_metrics['epoch'] = epoch_num
         self.epoch_metrics['loss'] = epoch_loss
+
+        # Calculate and log epoch balance
+        epoch_balance = calculate_epoch_balance(epoch_labels)
+        logger.info(f"Epoch {epoch_num} SOZ sampling ratio: {epoch_balance:.2%}")
+        self.epoch_metrics['soz_ratio'] = epoch_balance
+        
         return self.epoch_metrics
 
     def evaluate(self, epoch_num=None, keep_all=True):
-
         self.model = self.model.eval()
-
-        epoch_loss = 0  # total loss of epoch
-        total_samples = 0  # total samples in epoch
+        epoch_loss = 0
+        total_samples = 0
 
         per_batch = {'target_masks': [], 'targets': [], 'predictions': [], 'metrics': [], 'IDs': []}
         for i, batch in enumerate(self.dataloader):
-
             X, targets, padding_masks, IDs = batch
             targets = targets.to(self.device)
-            padding_masks = padding_masks.to(self.device)  # 0s: ignore
-            # regression: (batch_size, num_labels); classification: (batch_size, num_classes) of logits
+            padding_masks = padding_masks.to(self.device)
             predictions = self.model(X.to(self.device), padding_masks)
-
-            loss = self.loss_module(predictions, targets)  # (batch_size,) loss for each sample in the batch
+            
+            loss = self.loss_module(predictions, targets)
             batch_loss = torch.sum(loss).cpu().item()
-            mean_loss = batch_loss / len(loss)  # mean loss (over samples)
+            mean_loss = batch_loss / len(loss)
 
             per_batch['targets'].append(targets.cpu().numpy())
-            per_batch['predictions'].append(predictions.cpu().numpy())
-            per_batch['metrics'].append([loss.cpu().numpy()])
+            per_batch['predictions'].append(predictions.detach().cpu().numpy())
+            per_batch['metrics'].append([loss.detach().cpu().numpy()])
             per_batch['IDs'].append(IDs)
 
-            metrics = {"loss": mean_loss}
             if i % self.print_interval == 0:
                 ending = "" if epoch_num is None else 'Epoch {} '.format(epoch_num)
-                self.print_callback(i, metrics, prefix='Evaluating ' + ending)
+                self.print_callback(i, {"loss": mean_loss}, prefix='Evaluating ' + ending)
 
             total_samples += len(loss)
-            epoch_loss += batch_loss  # add total loss of batch
-        epoch_loss = epoch_loss / total_samples  # average loss per element for whole epoch
+            epoch_loss += batch_loss
+
+        epoch_loss = epoch_loss / total_samples
         self.epoch_metrics['epoch'] = epoch_num
         self.epoch_metrics['loss'] = epoch_loss
 
         if self.classification:
             predictions = torch.from_numpy(np.concatenate(per_batch['predictions'], axis=0))
-            probs = torch.nn.functional.softmax(predictions)  # (total_samples, num_classes) est. prob. for each class and sample
-            predictions = torch.argmax(probs, dim=1).cpu().numpy()  # (total_samples,) int class index for each sample
+            probs = torch.nn.functional.softmax(predictions, dim=1)
+            predictions = torch.argmax(probs, dim=1).cpu().numpy()
             probs = probs.cpu().numpy()
             targets = np.concatenate(per_batch['targets'], axis=0).flatten()
-            class_names = np.arange(probs.shape[1])  # TODO: temporary until I decide how to pass class names
+            class_names = np.arange(probs.shape[1])
             metrics_dict = self.analyzer.analyze_classification(predictions, targets, class_names)
 
-            self.epoch_metrics['accuracy'] = metrics_dict['total_accuracy']  # same as average recall over all classes
-            self.epoch_metrics['precision'] = metrics_dict['prec_avg']  # average precision over all classes
+            self.epoch_metrics['accuracy'] = metrics_dict['total_accuracy']
+            self.epoch_metrics['precision'] = metrics_dict['prec_avg']
 
             if self.model.num_classes == 2:
-                # Add the new binary classification metrics
-                self.epoch_metrics['sensitivity'] = metrics_dict['sensitivity']
-                self.epoch_metrics['specificity'] = metrics_dict['specificity']
-                self.epoch_metrics['youden_index'] = metrics_dict['youden_index']
-                
-                false_pos_rate, true_pos_rate, _ = sklearn.metrics.roc_curve(targets, probs[:, 1])  # 1D scores needed
+                false_pos_rate, true_pos_rate, _ = sklearn.metrics.roc_curve(targets, probs[:, 1])
                 self.epoch_metrics['AUROC'] = sklearn.metrics.auc(false_pos_rate, true_pos_rate)
 
                 prec, rec, _ = sklearn.metrics.precision_recall_curve(targets, probs[:, 1])
                 self.epoch_metrics['AUPRC'] = sklearn.metrics.auc(rec, prec)
+
         if keep_all:
             return self.epoch_metrics, per_batch
         else:
             return self.epoch_metrics
-
-
-    

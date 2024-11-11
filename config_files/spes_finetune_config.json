@@ -1,0 +1,41 @@
+{
+    "data_class": "spes",
+    "data_dir": "classification_datasets/SPES",
+    "output_dir": "output/spes/finetuned",
+    "load_model": "output/spes/pretrained/_2024-11-11_14-41-55_CQJ/checkpoints/model_best.pth",
+    "records_file": "classification_records.xls",
+    "model": "transformer",
+    "task": "classification",
+    "key_metric": "accuracy",
+    "print_interval": 5,
+
+
+    "batch_size": 32,
+    "max_seq_len": 487,
+    "d_model": 64,
+    "num_heads": 8,
+    "num_layers": 3,
+    "dim_feedforward": 256,
+    "dropout": 0.1,
+    "pos_encoding": "learnable",
+
+    "activation": "gelu",
+    "normalization": "per_sample_std",
+    "lr": 0.00001,
+    "epochs": 100,
+    "optimizer": "Adam",
+    "num_workers": 4,
+    "val_ratio": 0,
+    "pattern": "TRAIN",
+    "val_pattern": "TEST",
+    "early_stopping_patience": 5,
+    "early_stopping_delta": 0.01,
+
+
+    "pos_weight": 2.33,
+    "num_classes": 2,
+    "use_balanced_sampling": true,
+    "target_soz_ratio": 0.3,
+    "sampling_replacement": true
+
+} 

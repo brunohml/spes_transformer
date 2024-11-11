@@ -11,7 +11,8 @@ import pandas as pd
 from tqdm import tqdm
 from sktime.utils import load_data
 
-from src.datasets import utils
+from datasets import utils
+
 
 logger = logging.getLogger('__main__')
 
@@ -424,25 +425,122 @@ class PMUData(BaseData):
 
         return all_df
 
-    @staticmethod
-    def load_single(filepath):
-        df = PMUData.read_data(filepath)
-        #df = PMUData.select_columns(df)
-        num_nan = df.isna().sum().sum()
-        if num_nan > 0:
-            logger.warning("{} nan values in {} will be replaced by 0".format(num_nan, filepath))
-            df = df.fillna(0)
 
-        return df
-
-    @staticmethod
-    def read_data(filepath):
-        """Reads a single .csv, which typically contains a day of datasets of various weld sessions.
+class SPESData(BaseData):
+    """
+    Dataset class for SPES (Single Pulse Electrical Stimulation) dataset.
+    
+    Attributes:
+        all_df: (num_samples * seq_len, num_channels) dataframe indexed by integer indices, 
+            with multiple rows corresponding to the same index (sample).
+            Each row is a time step; Each column contains a channel feature.
+        feature_df: same as all_df (all columns except metadata are features)
+        feature_names: names of columns contained in feature_df
+        all_IDs: unique integer indices contained in all_df
+        labels_df: (num_samples, 1) dataframe containing SOZ labels for each trial
+    """
+    def __init__(self, data_dir, pattern=None, n_proc=1, limit_size=None, config=None):
         """
-        df = pd.read_csv(filepath)
-        return df
+        Initialize the SPES dataset from preprocessed CSV files
+        
+        Args:
+            data_dir: Directory containing processed CSV files
+            pattern: 'TRAIN' or 'TEST' to specify which split to load
+            n_proc: Number of processes (not used when loading preprocessed data)
+            limit_size: Optional size limit
+            config: Optional configuration
+        """
+        self.config = config
+        
+        # Load features and labels
+        if pattern == 'TEST':
+            df = pd.read_csv(os.path.join(data_dir, 'SPES_TEST.csv'), index_col=0)
+            labels_df = pd.read_csv(os.path.join(data_dir, 'SPES_TEST_labels.csv'), index_col=0)
+            logger.info(f"Loaded TEST data:")
+        else:
+            df = pd.read_csv(os.path.join(data_dir, 'SPES_TRAIN.csv'), index_col=0)
+            labels_df = pd.read_csv(os.path.join(data_dir, 'SPES_TRAIN_labels.csv'), index_col=0)
+            logger.info(f"Loaded TRAIN data:")
+        
+        # Set up features
+        self.feature_names = [col for col in df.columns if col.startswith('channel_')]
+        self.all_df = df
+        self.feature_df = self.all_df[self.feature_names]
+        self.all_IDs = self.all_df.index.unique()
+        
+        # Take only first label for each sequence
+        self.labels_df = pd.DataFrame(index=self.all_IDs)
+        self.labels_df['soz'] = [labels_df.iloc[i * 487]['soz'] for i in range(len(self.all_IDs))]
+        
+        logger.info(f"Features shape: {self.feature_df.shape}")
+        logger.info(f"Number of unique trials: {len(self.all_IDs)}")
+        logger.info(f"Label distribution: {self.labels_df['soz'].value_counts()}")
+        
+        if limit_size is not None:
+            if limit_size > 1:
+                limit_size = int(limit_size)
+            else:  # interpret as proportion if in (0, 1]
+                limit_size = int(limit_size * len(self.all_IDs))
+            self.all_IDs = self.all_IDs[:limit_size]
+            self.all_df = self.all_df.loc[self.all_IDs]
+            self.feature_df = self.feature_df.loc[self.all_IDs]
+            self.labels_df = self.labels_df.loc[self.all_IDs]
+
+    @property
+    def labels(self):
+        """Return labels for classification"""
+        return self.labels_df['soz'].values  # Return raw labels, let Dataset handle one-hot encoding
+
+    @property
+    def class_names(self):
+        """Return class names for classification"""
+        return ['non-SOZ', 'SOZ']  # Binary classification
+
+    def sanity_check_sequence(self, sample_id):
+        """
+        Verify that rows for a given sample ID form a complete sequence
+        
+        Args:
+            sample_id: ID of the sample to check
+        
+        Returns:
+            bool: True if sequence is valid, raises AssertionError otherwise
+        """
+        # Get all rows for this sample
+        sample_rows = self.all_df.loc[sample_id]
+        
+        # Checks
+        try:
+            # Check 1: We have exactly 487 time points
+            assert len(sample_rows) == 487, f"Sample {sample_id} has {len(sample_rows)} rows instead of 487"
+            
+            # Check 2: All rows have same metadata
+            metadata_cols = ['patient_id', 'stim_pair', 'trial_number', 'training_example_id']
+            for col in metadata_cols:
+                if col in sample_rows.columns:
+                    unique_vals = sample_rows[col].nunique()
+                    assert unique_vals == 1, f"Sample {sample_id} has {unique_vals} different {col} values"
+            
+            # Check 3: Sequence indices are sequential
+            if 'sequence_idx' in sample_rows.columns:
+                seq_indices = sample_rows['sequence_idx'].values
+                assert np.array_equal(seq_indices, np.arange(487)), \
+                    f"Sample {sample_id} sequence indices are not sequential"
+            
+            # Check 4: Channel columns exist and have no NaN values
+            channel_cols = [col for col in sample_rows.columns if col.startswith('channel_')]
+            assert len(channel_cols) == 36, f"Sample {sample_id} has {len(channel_cols)} channels instead of 36"
+            assert not sample_rows[channel_cols].isna().any().any(), \
+                f"Sample {sample_id} has NaN values in channel data"
+                
+            return True
+            
+        except AssertionError as e:
+            print(f"Sanity check failed for sample {sample_id}: {str(e)}")
+            return False
 
 
 data_factory = {'weld': WeldData,
                 'tsra': TSRegressionArchive,
-                'pmu': PMUData}
+                'pmu': PMUData,
+                'spes': SPESData}
