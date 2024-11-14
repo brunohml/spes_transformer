@@ -262,64 +262,7 @@ class BaseRunner(object):
         raise NotImplementedError('Please override in child class')
 
     def evaluate(self, epoch_num=None, keep_all=True):
-        self.model = self.model.eval()
-        epoch_loss = 0
-        epoch_recon_acc = 0
-        total_active_elements = 0
-
-        if keep_all:
-            per_batch = {'target_masks': [], 'targets': [], 'predictions': [], 'metrics': [], 'IDs': []}
-        
-        for i, batch in enumerate(self.dataloader):
-            X, targets, target_masks, padding_masks, IDs = batch
-            targets = targets.to(self.device)
-            target_masks = target_masks.to(self.device)
-            padding_masks = padding_masks.to(self.device)
-
-            predictions = self.model(X.to(self.device), padding_masks)
-            target_masks = target_masks * padding_masks.unsqueeze(-1)
-            
-            # Calculate MSE loss
-            loss = self.loss_module(predictions, targets, target_masks)
-            batch_loss = torch.sum(loss).cpu().item()
-            mean_loss = batch_loss / len(loss)
-
-            # Calculate reconstruction accuracy
-            with torch.no_grad():
-                masked_pred = torch.masked_select(predictions, target_masks)
-                masked_true = torch.masked_select(targets, target_masks)
-                recon_acc = torch.mean((torch.abs(masked_pred - masked_true) < 0.2).float())
-
-            if keep_all:
-                per_batch['target_masks'].append(target_masks.cpu().numpy())
-                per_batch['targets'].append(targets.cpu().numpy())
-                per_batch['predictions'].append(predictions.cpu().numpy())
-                per_batch['metrics'].append([loss.cpu().numpy()])
-                per_batch['IDs'].append(IDs)
-
-            metrics = {
-                "loss": mean_loss,
-                "recon_acc": recon_acc.item()
-            }
-            
-            if i % self.print_interval == 0:
-                ending = "" if epoch_num is None else 'Epoch {} '.format(epoch_num)
-                self.print_callback(i, metrics, prefix='Evaluating ' + ending)
-
-            total_active_elements += len(loss)
-            epoch_loss += batch_loss
-            epoch_recon_acc += recon_acc.item() * len(loss)
-
-        epoch_loss = epoch_loss / total_active_elements
-        epoch_recon_acc = epoch_recon_acc / total_active_elements
-        self.epoch_metrics['epoch'] = epoch_num
-        self.epoch_metrics['loss'] = epoch_loss
-        self.epoch_metrics['recon_acc'] = epoch_recon_acc
-
-        if keep_all:
-            return self.epoch_metrics, per_batch
-        else:
-            return self.epoch_metrics
+        raise NotImplementedError('Please override in child class')
 
     def print_callback(self, i_batch, metrics, prefix=''):
         """Print training progress at specified intervals"""
@@ -346,36 +289,43 @@ class BaseRunner(object):
 
 class UnsupervisedRunner(BaseRunner):
 
+    def __init__(self, model, dataloader, device, loss_module, optimizer, l2_reg=None, print_interval=10, console=True):
+        super().__init__(model, dataloader, device, loss_module, optimizer, l2_reg, print_interval, console)
+        self.best_model = None  # Initialize best_model attribute
+        
+    def _save_best_model(self, epoch, val_loss, is_best):
+        """Saves model when validation loss decreases.
+        If is_best is True, also saves model_best.pth
+        """
+        if is_best:
+            self.best_model = self.model  # Update best_model when we get a new best
+            
     def train_epoch(self, epoch_num=None):
+
         self.model = self.model.train()
-        epoch_loss = 0  
-        epoch_recon_acc = 0
-        total_active_elements = 0
-        epoch_labels = []
+
+        epoch_loss = 0  # total loss of epoch
+        total_active_elements = 0  # total unmasked elements in epoch
+        epoch_labels = []  # store labels for balance calculation
         
         for i, batch in enumerate(self.dataloader):
             X, targets, target_masks, padding_masks, IDs = batch
+            # Store labels for balance calculation
             if hasattr(self.dataloader.dataset.data, 'labels_df'):
                 batch_labels = self.dataloader.dataset.data.labels_df.loc[IDs]['soz'].values
                 epoch_labels.append(torch.tensor(batch_labels))
             
             targets = targets.to(self.device)
-            target_masks = target_masks.to(self.device)
-            padding_masks = padding_masks.to(self.device)
+            target_masks = target_masks.to(self.device)  # 1s: mask and predict, 0s: unaffected input (ignore)
+            padding_masks = padding_masks.to(self.device)  # 0s: ignore
 
-            predictions = self.model(X.to(self.device), padding_masks)
+            predictions = self.model(X.to(self.device), padding_masks)  # (batch_size, padded_length, feat_dim)
+
+            # Cascade noise masks (batch_size, padded_length, feat_dim) and padding masks (batch_size, padded_length)
             target_masks = target_masks * padding_masks.unsqueeze(-1)
-            
-            # Calculate MSE loss as before
-            loss = self.loss_module(predictions, targets, target_masks)
+            loss = self.loss_module(predictions, targets, target_masks)  # (num_active,) individual loss (square error per element) for each active value in batch
             batch_loss = torch.sum(loss)
-            mean_loss = batch_loss / len(loss)
-
-            # Calculate reconstruction accuracy
-            with torch.no_grad():
-                masked_pred = torch.masked_select(predictions, target_masks)
-                masked_true = torch.masked_select(targets, target_masks)
-                recon_acc = torch.mean((torch.abs(masked_pred - masked_true) < 0.2).float())
+            mean_loss = batch_loss / len(loss)  # mean loss (over active elements) used for optimization
 
             if self.l2_reg is not None:
                 l2_term = l2_reg_loss(self.model)
@@ -383,88 +333,104 @@ class UnsupervisedRunner(BaseRunner):
             else:
                 total_loss = mean_loss
 
+            # Zero gradients, perform a backward pass, and update the weights.
             self.optimizer.zero_grad()
             total_loss.backward()
+
+            # torch.nn.utils.clip_grad_value_(self.model.parameters(), clip_value=1.0)
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=4.0)
             self.optimizer.step()
 
-            metrics = {
-                "loss": mean_loss.item(),
-                "recon_acc": recon_acc.item()
-            }
-            
+            metrics = {"loss": mean_loss.item()}
             if i % self.print_interval == 0:
                 ending = "" if epoch_num is None else f'Epoch {epoch_num} '
                 self.print_callback(i, metrics, prefix='Training ' + ending)
 
             with torch.no_grad():
                 total_active_elements += len(loss)
-                epoch_loss += batch_loss.item()
-                epoch_recon_acc += recon_acc.item() * len(loss)
+                epoch_loss += batch_loss.item()  # add total loss of batch
 
-        epoch_loss = epoch_loss / total_active_elements
-        epoch_recon_acc = epoch_recon_acc / total_active_elements
+        epoch_loss = epoch_loss / total_active_elements  # average loss per element for whole epoch
         self.epoch_metrics['epoch'] = epoch_num
         self.epoch_metrics['loss'] = epoch_loss
-        self.epoch_metrics['recon_acc'] = epoch_recon_acc
 
+        # Calculate and log epoch balance
         if epoch_labels:
             epoch_balance = calculate_epoch_balance(epoch_labels)
             logger.info(f"Epoch {epoch_num} SOZ sampling ratio: {epoch_balance:.2%}")
             self.epoch_metrics['soz_ratio'] = epoch_balance
         
+        if self.best_model and epoch_num == self.epochs:
+            from utils.visualization_utils import create_imputation_visualization
+            create_imputation_visualization(
+                self.best_model, 
+                self.dataloader.dataset.data, 
+                self.device, 
+                self.config, 
+                os.path.join(self.output_dir, 'imputation_visualization.png')
+            )
+        
         return self.epoch_metrics
 
     def evaluate(self, epoch_num=None, keep_all=True):
-
         self.model = self.model.eval()
-
-        epoch_loss = 0  # total loss of epoch
-        total_active_elements = 0  # total unmasked elements in epoch
+        epoch_loss = 0
+        epoch_recon_acc = 0
+        total_active_elements = 0
 
         if keep_all:
             per_batch = {'target_masks': [], 'targets': [], 'predictions': [], 'metrics': [], 'IDs': []}
+        
         for i, batch in enumerate(self.dataloader):
-
             X, targets, target_masks, padding_masks, IDs = batch
             targets = targets.to(self.device)
-            target_masks = target_masks.to(self.device)  # 1s: mask and predict, 0s: unaffected input (ignore)
-            padding_masks = padding_masks.to(self.device)  # 0s: ignore
+            target_masks = target_masks.to(self.device)
+            padding_masks = padding_masks.to(self.device)
 
-            # TODO: for debugging
-            # input_ok = utils.check_tensor(X, verbose=False, zero_thresh=1e-8, inf_thresh=1e4)
-            # if not input_ok:
-            #     print("Input problem!")
-            #     ipdb.set_trace()
-            #
-            # utils.check_model(self.model, verbose=False, stop_on_error=True)
+            with torch.no_grad():
+                predictions = self.model(X.to(self.device), padding_masks)
+                target_masks = target_masks * padding_masks.unsqueeze(-1)
+                
+                loss = self.loss_module(predictions, targets, target_masks)
+                batch_loss = torch.sum(loss).cpu().item()
+                mean_loss = batch_loss / len(loss)
 
-            predictions = self.model(X.to(self.device), padding_masks)  # (batch_size, padded_length, feat_dim)
+                # Calculate reconstruction accuracy
+                masked_pred = torch.masked_select(predictions, target_masks)
+                masked_true = torch.masked_select(targets, target_masks)
+                batch_recon_acc = torch.mean((torch.abs(masked_pred - masked_true) < 0.4).float())
 
-            # Cascade noise masks (batch_size, padded_length, feat_dim) and padding masks (batch_size, padded_length)
-            target_masks = target_masks * padding_masks.unsqueeze(-1)
-            loss = self.loss_module(predictions, targets, target_masks)  # (num_active,) individual loss (square error per element) for each active value in batch
-            batch_loss = torch.sum(loss).cpu().item()
-            mean_loss = batch_loss / len(loss)  # mean loss (over active elements) used for optimization the batch
+                if keep_all:
+                    per_batch['target_masks'].append(target_masks.cpu().numpy())
+                    per_batch['targets'].append(targets.cpu().numpy())
+                    per_batch['predictions'].append(predictions.cpu().numpy())
+                    # Store both metrics with same shape as loss
+                    per_batch['metrics'].append([
+                        loss.cpu().numpy(),
+                        torch.full_like(loss, batch_recon_acc.item()).cpu().numpy()
+                    ])
+                    per_batch['IDs'].append(IDs)
 
-            if keep_all:
-                per_batch['target_masks'].append(target_masks.cpu().numpy())
-                per_batch['targets'].append(targets.cpu().numpy())
-                per_batch['predictions'].append(predictions.cpu().numpy())
-                per_batch['metrics'].append([loss.cpu().numpy()])
-                per_batch['IDs'].append(IDs)
+                metrics = {
+                    "loss": mean_loss,
+                    "recon_acc": batch_recon_acc.item()
+                }
+                
+                if i % self.print_interval == 0:
+                    ending = "" if epoch_num is None else f'Epoch {epoch_num} '
+                    self.print_callback(i, metrics, prefix='Evaluating ' + ending)
 
-            metrics = {"loss": mean_loss}
-            if i % self.print_interval == 0:
-                ending = "" if epoch_num is None else 'Epoch {} '.format(epoch_num)
-                self.print_callback(i, metrics, prefix='Evaluating ' + ending)
+                total_active_elements += len(loss)
+                epoch_loss += batch_loss
+                epoch_recon_acc += batch_recon_acc.item() * len(loss)
 
-            total_active_elements += len(loss)
-            epoch_loss += batch_loss  # add total loss of batch
-
-        epoch_loss = epoch_loss / total_active_elements  # average loss per element for whole epoch
+        # Properly weight metrics by number of active elements
+        epoch_loss = epoch_loss / total_active_elements
+        epoch_recon_acc = epoch_recon_acc / total_active_elements
+        
         self.epoch_metrics['epoch'] = epoch_num
         self.epoch_metrics['loss'] = epoch_loss
+        self.epoch_metrics['recon_acc'] = epoch_recon_acc
 
         if keep_all:
             return self.epoch_metrics, per_batch

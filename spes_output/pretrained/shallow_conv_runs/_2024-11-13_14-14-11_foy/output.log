@@ -1,0 +1,63 @@
+Running:
+src/main.py --config config_files/spes_pretrain_config.json --comment mean_mask_length = 5 | masking_ratio = 0.3 | kernel width 15 | lr 0.001 | l2_reg 0.001 | d_model 256 | dropout 0.2 | end_hint 200
+
+Using device: cuda
+Loading and preprocessing data ...
+Loaded TRAIN data:
+Features shape: (6895920, 36)
+Number of unique trials: 14160
+Label distribution: soz
+0    9309
+1    4851
+Name: count, dtype: int64
+Loaded TEST data:
+Features shape: (306810, 36)
+Number of unique trials: 630
+Label distribution: soz
+0    430
+1    200
+Name: count, dtype: int64
+14160 samples may be used for training
+630 samples will be used for validation
+0 samples will be used for testing
+Normalizing data using per_sample_std method
+Normalizing data using per_sample_std method
+Creating model ...
+Model:
+TSTransformerEncoder(
+  (project_inp): ProjectionLayer(
+    (projection): Conv1d(36, 256, kernel_size=(15,), stride=(1,), padding=(7,))
+  )
+  (pos_enc): LearnablePositionalEncoding(
+    (dropout): Dropout(p=0.2, inplace=False)
+  )
+  (transformer_encoder): TransformerEncoder(
+    (layers): ModuleList(
+      (0-3): 4 x TransformerBatchNormEncoderLayer(
+        (self_attn): MultiheadAttention(
+          (out_proj): NonDynamicallyQuantizableLinear(in_features=256, out_features=256, bias=True)
+        )
+        (linear1): Linear(in_features=256, out_features=512, bias=True)
+        (dropout): Dropout(p=0.2, inplace=False)
+        (linear2): Linear(in_features=512, out_features=256, bias=True)
+        (norm1): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (norm2): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (dropout1): Dropout(p=0.2, inplace=False)
+        (dropout2): Dropout(p=0.2, inplace=False)
+      )
+    )
+  )
+  (output_layer): Linear(in_features=256, out_features=36, bias=True)
+  (dropout1): Dropout(p=0.2, inplace=False)
+)
+Total number of parameters: 2380836
+Trainable parameters: 2380836
+Evaluating on validation set ...
+Validation runtime: 0.0 hours, 0.0 minutes, 1.0104906558990479 seconds
+
+Avg val. time: 0.0 hours, 0.0 minutes, 1.0104906558990479 seconds
+Avg batch val. time: 0.05052453279495239 seconds
+Avg sample val. time: 0.0016039534220619806 seconds
+Epoch 0 Validation Summary: epoch: 0.000000 | loss: 59.464944 | recon_acc: 0.041574 | 
+Starting training...
+Epoch 1 SOZ sampling ratio: 34.26%

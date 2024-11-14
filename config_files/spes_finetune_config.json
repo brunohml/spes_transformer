@@ -1,8 +1,8 @@
 {
     "data_class": "spes",
-    "data_dir": "classification_datasets/SPES",
-    "output_dir": "output/spes/finetuned",
-    "load_model": "output/spes/pretrained/_2024-11-11_14-41-55_CQJ/checkpoints/model_best.pth",
+    "data_dir": "classification_datasets/SPES/soz_0.3",
+    "output_dir": "spes_output/finetuned",
+    "load_model": "spes_output/pretrained/_2024-11-13_18-58-04_MXq/checkpoints/model_best.pth",
     "records_file": "classification_records.xls",
     "model": "transformer",
     "task": "classification",
@@ -12,11 +12,11 @@
 
     "batch_size": 32,
     "max_seq_len": 487,
-    "d_model": 64,
+    "d_model": 256,
     "num_heads": 8,
-    "num_layers": 3,
-    "dim_feedforward": 256,
-    "dropout": 0.1,
+    "num_layers": 4,
+    "dim_feedforward": 512,
+    "dropout": 0.2,
     "pos_encoding": "learnable",
 
     "activation": "gelu",
@@ -32,10 +32,10 @@
     "early_stopping_delta": 0.01,
 
 
-    "pos_weight": 2.33,
+    "pos_weight": 3.0,
     "num_classes": 2,
-    "use_balanced_sampling": true,
-    "target_soz_ratio": 0.3,
-    "sampling_replacement": true
+    "use_balanced_sampling": false,
+    "freeze": true,
+    "change_output": true
 
 } 

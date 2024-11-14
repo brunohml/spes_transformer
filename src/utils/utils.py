@@ -12,6 +12,9 @@ import torch
 import xlrd
 import xlwt
 from xlutils.copy import copy
+import matplotlib.pyplot as plt
+from datetime import datetime
+import textwrap
 
 import logging
 logging.basicConfig(format='%(asctime)s | %(levelname)s : %(message)s', level=logging.INFO)
@@ -343,74 +346,72 @@ def compute_loss(net: torch.nn.Module,
     return running_loss / len(dataloader)
 
 
-def plot_metrics(output_dir, metrics_dict):
-    """Create training/validation metric plots."""
-    import matplotlib.pyplot as plt
-    import numpy as np
+def plot_metrics(output_dir, metrics_dict, loss_name='loss', model_dir=None, comment=None):
+    """
+    Args:
+        output_dir: directory to save the plots
+        metrics_dict: dictionary of training and validation metrics
+        loss_name: name of loss function used
+        model_dir: optional model directory name for plot title
+        comment: optional comment to add to plot title
+    """
+    # Set style
+    plt.style.use('seaborn')
     
-    # Plot losses
-    plt.figure(figsize=(10,6))
+    # Create figure with higher DPI for better quality
+    plt.figure(figsize=(12, 8), dpi=150)
     
-    # Get epochs array for x-axis
-    epochs = np.arange(1, len(metrics_dict['train_loss']) + 1)
+    # Get number of epochs from the length of any metric list
+    n_epochs = len(next(iter(metrics_dict.values())))
+    epochs = np.arange(1, n_epochs + 1)
     
-    # Plot training loss
-    plt.plot(epochs, metrics_dict['train_loss'], label='Training Loss', color='blue')
-    
-    # Convert validation losses to numpy array and mask invalid values
-    val_losses = np.array(metrics_dict['val_loss'])
-    mask = ~np.isnan(val_losses) if isinstance(val_losses[0], float) else [x is not None for x in val_losses]
-    valid_epochs = epochs[mask]
-    valid_losses = val_losses[mask]
-    
-    # Plot validation loss only if we have valid points
-    if len(valid_epochs) > 0:
-        plt.plot(valid_epochs, valid_losses, 
-                label='Validation Loss', 
-                color='red',
+    # Plot with thicker lines and markers
+    if 'train_loss' in metrics_dict and len(metrics_dict['train_loss']) > 0:
+        plt.plot(epochs, metrics_dict['train_loss'], 
+                label='Training Loss', 
+                linewidth=2.5, 
                 marker='o',
-                linestyle='--',
                 markersize=6)
     
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Training and Validation Loss')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(os.path.join(output_dir, 'loss_plot.png'))
+    if 'val_loss' in metrics_dict and len(metrics_dict['val_loss']) > 0:
+        val_epochs = epochs[~np.isnan(metrics_dict['val_loss'])]
+        val_losses = np.array(metrics_dict['val_loss'])[~np.isnan(metrics_dict['val_loss'])]
+        plt.plot(val_epochs, val_losses, 
+                label='Validation Loss', 
+                linewidth=2.5, 
+                marker='s',
+                markersize=6)
+    
+    # Create title with additional information if provided
+    title = 'Training and Validation Loss Over Time'
+    if model_dir:
+        title = f'{model_dir}\n{title}'
+    if comment:
+        # Format the comment to wrap at 100 characters
+        wrapped_comment = '\n'.join(textwrap.wrap(comment, width=100))
+        title = f'{title}\n{wrapped_comment}'
+    
+    # Customize the plot
+    plt.title(title, pad=20, fontsize=12, fontweight='bold')
+    plt.xlabel('Epoch', fontsize=11, fontweight='bold')
+    plt.ylabel(loss_name.capitalize(), fontsize=11, fontweight='bold')
+    
+    # Customize grid
+    plt.grid(True, linestyle='--', alpha=0.7)
+    
+    # Customize legend
+    plt.legend(fontsize=10, frameon=True, facecolor='white', edgecolor='gray',
+              bbox_to_anchor=(1.02, 1), loc='upper left')
+    
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # Save with high DPI
+    plt.savefig(os.path.join(output_dir, f'loss_plot.png'), 
+                dpi=300, 
+                bbox_inches='tight',
+                facecolor='white')
     plt.close()
-
-    # Plot accuracies only if both training and validation accuracies exist and have data
-    if ('train_accuracy' in metrics_dict and len(metrics_dict['train_accuracy']) > 0 and
-        'val_accuracy' in metrics_dict and len(metrics_dict['val_accuracy']) > 0):
-        plt.figure(figsize=(10,6))
-        
-        # Plot training accuracy
-        plt.plot(epochs, metrics_dict['train_accuracy'], 
-                label='Training Accuracy', 
-                color='blue')
-        
-        # Handle validation accuracy similarly to validation loss
-        val_accs = np.array(metrics_dict['val_accuracy'])
-        mask = ~np.isnan(val_accs) if isinstance(val_accs[0], float) else [x is not None for x in val_accs]
-        valid_epochs = epochs[mask]
-        valid_accs = val_accs[mask]
-        
-        if len(valid_epochs) > 0:
-            plt.plot(valid_epochs, valid_accs, 
-                    label='Validation Accuracy', 
-                    color='red',
-                    marker='o',
-                    linestyle='--',
-                    markersize=6)
-        
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy')
-        plt.title('Training and Validation Accuracy')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig(os.path.join(output_dir, 'accuracy_plot.png'))
-        plt.close()
 
 
 def calculate_epoch_balance(batch_labels):

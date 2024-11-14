@@ -29,7 +29,10 @@ def model_factory(config, data):
             return TSTransformerEncoder(feat_dim, max_seq_len, config['d_model'], config['num_heads'],
                                         config['num_layers'], config['dim_feedforward'], dropout=config['dropout'],
                                         pos_encoding=config['pos_encoding'], activation=config['activation'],
-                                        norm=config['normalization_layer'], freeze=config['freeze'])
+                                        norm=config['normalization_layer'], freeze=config['freeze'],
+                                        projection_layer=config['projection_layer'],
+                                        kernel_width=config['kernel_width'],
+                                        conv_stride=config['conv_stride'])
 
     if (task == "classification") or (task == "regression"):
         num_labels = len(data.class_names) if task == "classification" else data.labels_df.shape[1]  # dimensionality of labels
@@ -168,22 +171,18 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
         super(TransformerBatchNormEncoderLayer, self).__setstate__(state)
 
     def forward(self, src: Tensor, src_mask: Optional[Tensor] = None,
-                src_key_padding_mask: Optional[Tensor] = None, **kwargs) -> Tensor: # added **kwargs to address TypeError: forward() got unexpected kwarg "is_causal"
-        r"""Pass the input through the encoder layer.
-
+                src_key_padding_mask: Optional[Tensor] = None, **kwargs) -> Tensor:
+        """Pass the input through the encoder layer.
         Args:
             src: the sequence to the encoder layer (required).
             src_mask: the mask for the src sequence (optional).
             src_key_padding_mask: the mask for the src keys per batch (optional).
-
-        Shape:
-            see the docs in Transformer class.
+            **kwargs: Catches additional arguments like is_causal that might be passed from newer PyTorch versions
         """
         src2 = self.self_attn(src, src, src, attn_mask=src_mask,
                               key_padding_mask=src_key_padding_mask)[0]
         src = src + self.dropout1(src2)  # (seq_len, batch_size, d_model)
         src = src.permute(1, 2, 0)  # (batch_size, d_model, seq_len)
-        # src = src.reshape([src.shape[0], -1])  # (batch_size, seq_length * d_model)
         src = self.norm1(src)
         src = src.permute(2, 0, 1)  # restore (seq_len, batch_size, d_model)
         src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
@@ -197,14 +196,20 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
 class TSTransformerEncoder(nn.Module):
 
     def __init__(self, feat_dim, max_len, d_model, n_heads, num_layers, dim_feedforward, dropout=0.1,
-                 pos_encoding='fixed', activation='gelu', norm='BatchNorm', freeze=False):
+                 pos_encoding='fixed', activation='gelu', norm='BatchNorm', freeze=False,
+                 projection_layer='linear', kernel_width=3, conv_stride=1):
         super(TSTransformerEncoder, self).__init__()
 
         self.max_len = max_len
         self.d_model = d_model
         self.n_heads = n_heads
 
-        self.project_inp = nn.Linear(feat_dim, d_model)
+        self.project_inp = ProjectionLayer(
+            feat_dim, d_model, 
+            projection_type=projection_layer,
+            kernel_width=kernel_width, 
+            conv_stride=conv_stride
+        )
         self.pos_enc = get_pos_encoder(pos_encoding)(d_model, dropout=dropout*(1.0 - freeze), max_len=max_len)
 
         if norm == 'LayerNorm':
@@ -230,19 +235,22 @@ class TSTransformerEncoder(nn.Module):
         Returns:
             output: (batch_size, seq_length, feat_dim)
         """
-
-        # permute because pytorch convention for transformers is [seq_length, batch_size, feat_dim]. padding_masks [batch_size, feat_dim]
-        inp = X.permute(1, 0, 2)
-        inp = self.project_inp(inp) * math.sqrt(
-            self.d_model)  # [seq_length, batch_size, d_model] project input vectors to d_model dimensional space
-        inp = self.pos_enc(inp)  # add positional encoding
-        # NOTE: logic for padding masks is reversed to comply with definition in MultiHeadAttention, TransformerEncoderLayer
-        output = self.transformer_encoder(inp, src_key_padding_mask=~padding_masks)  # (seq_length, batch_size, d_model)
-        output = self.act(output)  # the output transformer encoder/decoder embeddings don't include non-linearity
-        output = output.permute(1, 0, 2)  # (batch_size, seq_length, d_model)
+        # For linear projection: permute to (seq_length, batch_size, feat_dim)
+        # For conv1d: keep as (batch_size, seq_length, feat_dim)
+        if self.project_inp.projection_type == 'linear':
+            inp = X.permute(1, 0, 2)
+        else:
+            inp = X
+        
+        inp = self.project_inp(inp)  # ProjectionLayer handles permutation and scaling
+        
+        # Rest of forward pass remains the same
+        inp = self.pos_enc(inp)
+        output = self.transformer_encoder(inp, src_key_padding_mask=~padding_masks)
+        output = self.act(output)
+        output = output.permute(1, 0, 2)
         output = self.dropout1(output)
-        # Most probably defining a Linear(d_model,feat_dim) vectorizes the operation over (seq_length, batch_size).
-        output = self.output_layer(output)  # (batch_size, seq_length, feat_dim)
+        output = self.output_layer(output)
 
         return output
 
@@ -311,4 +319,38 @@ class TSTransformerEncoderClassiregressor(nn.Module):
         output = self.output_layer(output)  # (batch_size, num_classes)
 
         return output
+
+
+class ProjectionLayer(nn.Module):
+    def __init__(self, feat_dim, d_model, projection_type='linear', kernel_width=3, conv_stride=1):
+        super(ProjectionLayer, self).__init__()
+        self.projection_type = projection_type
+        self.d_model = d_model
+
+        if projection_type == 'linear':
+            self.projection = nn.Linear(feat_dim, d_model)
+        elif projection_type == 'conv1d':
+            padding = (kernel_width - 1) // 2
+            self.projection = nn.Conv1d(
+                in_channels=feat_dim,
+                out_channels=d_model,
+                kernel_size=kernel_width,
+                stride=conv_stride,
+                padding=padding
+            )
+        else:
+            raise ValueError(f"Unknown projection type: {projection_type}")
+
+    def forward(self, x):
+        # x shape: (seq_length, batch_size, feat_dim) for linear
+        #         (batch_size, seq_length, feat_dim) for conv1d
+        if self.projection_type == 'linear':
+            return self.projection(x) * math.sqrt(self.d_model)
+        else:
+            # Permute for Conv1d: (batch_size, feat_dim, seq_length)
+            x = x.permute(0, 2, 1)
+            # Apply Conv1d and scaling
+            x = self.projection(x) * math.sqrt(self.d_model)
+            # Permute back: (seq_length, batch_size, d_model)
+            return x.permute(2, 0, 1)
 

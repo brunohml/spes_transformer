@@ -65,6 +65,9 @@ class Normalizer(object):
             min_vals = grouped.transform('min')
             return (df - min_vals) / (grouped.transform('max') - min_vals + np.finfo(float).eps)
 
+        elif self.norm_type == "preproc_normalized": # data has been normalized in preprocessing, don't normalize during run
+            return df
+
         else:
             raise (NameError(f'Normalize method "{self.norm_type}" not implemented'))
 

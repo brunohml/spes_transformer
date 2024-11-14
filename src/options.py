@@ -74,7 +74,7 @@ class Options(object):
                                  help="""Regex pattern used to select files contained in `data_dir` exclusively for the test set.
                             If None, `test_ratio`, if specified, will be used to reserve part of the common data set.""")
         self.parser.add_argument('--normalization',
-                                 choices={'standardization', 'minmax', 'per_sample_std', 'per_sample_minmax'},
+                                 choices={'standardization', 'minmax', 'per_sample_std', 'per_sample_minmax', 'preproc_normalized'},
                                  default='standardization',
                                  help='If specified, will apply normalization on the input features of a dataset.')
         self.parser.add_argument('--norm_from',
@@ -135,10 +135,6 @@ class Options(object):
                                  help='Metric used for defining best epoch')
         self.parser.add_argument('--freeze', action='store_true',
                                  help='If set, freezes all layer parameters except for the output layer. Also removes dropout except before the output layer')
-        self.parser.add_argument('--early_stopping_patience', type=int, default=10,
-                        help='Number of epochs to wait before early stopping')
-        self.parser.add_argument('--early_stopping_delta', type=float, default=0,
-                        help='Minimum change in monitored quantity to qualify as an improvement')
 
         # Model
         self.parser.add_argument('--model', choices={"transformer", "LINEAR"}, default="transformer",
@@ -166,6 +162,12 @@ class Options(object):
                                  help='Activation to be used in transformer encoder')
         self.parser.add_argument('--normalization_layer', choices={'BatchNorm', 'LayerNorm'}, default='BatchNorm',
                                  help='Normalization layer to be used internally in transformer encoder')
+        self.parser.add_argument('--projection_layer', choices={'linear', 'conv1d'}, default='linear',
+                        help='Type of projection layer to use before transformer encoder')
+        self.parser.add_argument('--kernel_width', type=int, default=3,
+                        help='Width of the convolutional kernel in timesteps (only used if projection_layer="conv1d")')
+        self.parser.add_argument('--conv_stride', type=int, default=1,
+                        help='Stride of the convolution operation (only used if projection_layer="conv1d")')
 
     def parse(self):
 

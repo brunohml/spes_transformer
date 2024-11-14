@@ -44,10 +44,15 @@ def main(config):
     # Initialize dictionary to store metrics for plotting
     metrics_dict = {
         'train_loss': [],      # Store training loss for each epoch
-        'val_loss': [],        # Store validation loss for each epoch
-        'train_accuracy': [],  # Store training accuracy (if applicable)
-        'val_accuracy': []     # Store validation accuracy (if applicable)
+        'val_loss': []         # Store validation loss for each epoch
     }
+
+    # Only add accuracy metrics if it's a classification task
+    if config['task'] == 'classification':
+        metrics_dict.update({
+            'train_accuracy': [],  
+            'val_accuracy': []     
+        })
 
     total_epoch_time = 0
     total_eval_time = 0
@@ -133,11 +138,13 @@ def main(config):
 
     # Pre-process features
     normalizer = None
+    logger.info(f"Normalizing data using {config['normalization']} method")
     if config['norm_from']:
         with open(config['norm_from'], 'rb') as f:
             norm_dict = pickle.load(f)
         normalizer = Normalizer(**norm_dict)
     elif config['normalization'] is not None:
+        logger.info(f"Normalizing data using {config['normalization']} method")
         normalizer = Normalizer(config['normalization'])
         my_data.feature_df.loc[train_indices] = normalizer.normalize(my_data.feature_df.loc[train_indices])
         if not config['normalization'].startswith('per_sample'):
@@ -256,8 +263,16 @@ def main(config):
 
     trainer = runner_class(model, train_loader, device, loss_module, optimizer, l2_reg=output_reg,
                                  print_interval=config['print_interval'], console=config['console'])
-    val_evaluator = runner_class(model, val_loader, device, loss_module,
-                                       print_interval=config['print_interval'], console=config['console'])
+    val_evaluator = runner_class(
+        model, 
+        val_loader, 
+        device, 
+        loss_module,
+        optimizer=None,  # Pass None for optimizer during validation
+        l2_reg=config['l2_reg'] if 'l2_reg' in config else None,
+        print_interval=config['print_interval'],
+        console=config['console'] if 'console' in config else True
+    )
 
     tensorboard_writer = SummaryWriter(config['tensorboard_dir'])
 
@@ -301,30 +316,35 @@ def main(config):
         logger.info("Avg batch train. time: {} seconds".format(avg_batch_time))
         logger.info("Avg sample train. time: {} seconds".format(avg_sample_time))
 
-        # evaluate if first or last epoch or at specified interval
+        # Store training metrics BEFORE validation check
+        # Store training metrics after each epoch for plotting
+        metrics_dict['train_loss'].append(aggr_metrics_train['loss'])
+
+        # Store accuracy for plotting if it's a classification task
+        if 'accuracy' in aggr_metrics_train:
+            metrics_dict['train_accuracy'].append(aggr_metrics_train['accuracy'])
+
+        # Then do validation check and storage
         if (epoch == config["epochs"]) or (epoch == start_epoch + 1) or (epoch % config['val_interval'] == 0):
             aggr_metrics_val, best_metrics, best_value = validate(val_evaluator, tensorboard_writer, config,
-                                                                  best_metrics, best_value, epoch)
+                                                                best_metrics, best_value, epoch)
             metrics_names, metrics_values = zip(*aggr_metrics_val.items())
             metrics.append(list(metrics_values))
+
+            # Store validation metrics for plotting
+            metrics_dict['val_loss'].append(aggr_metrics_val['loss'])
+            if 'accuracy' in aggr_metrics_val:
+                metrics_dict['val_accuracy'].append(aggr_metrics_val['accuracy'])
 
             # Check early stopping conditions
             early_stopping(aggr_metrics_val['loss'], model)
             if early_stopping.early_stop:
-                logger.info("Early stopping triggered")
+                logger.info("Early stopping triggered - training stopped")
                 break
-
-            # Store validation metrics for plotting
-            metrics_dict['val_loss'].append(aggr_metrics_val['loss'])
-
-            # Store validation accuracy for plotting if it's a classification task
-            if 'accuracy' in aggr_metrics_val:
-                metrics_dict['val_accuracy'].append(aggr_metrics_val['accuracy'])
-                
         else:
             # For epochs where we don't validate, append NaN
             metrics_dict['val_loss'].append(float('nan'))
-            if 'accuracy' in aggr_metrics_val:
+            if 'accuracy' in metrics_dict:
                 metrics_dict['val_accuracy'].append(float('nan'))
 
         utils.save_model(os.path.join(config['save_dir'], 'model_{}.pth'.format(mark)), epoch, model, optimizer)
@@ -343,13 +363,6 @@ def main(config):
         if config['harden'] and check_progress(epoch):
             train_loader.dataset.update()
             val_loader.dataset.update()
-
-        # Store training metrics after each epoch for plotting
-        metrics_dict['train_loss'].append(aggr_metrics_train['loss'])
-
-        # Store accuracy for plotting if it's a classification task
-        if 'accuracy' in aggr_metrics_train:
-            metrics_dict['train_accuracy'].append(aggr_metrics_train['accuracy'])
 
     # Export evolution of metrics over epochs
     header = metrics_names
@@ -371,7 +384,17 @@ def main(config):
     print(f"Train loss points: {len(metrics_dict['train_loss'])}")
     print(f"Val loss points: {len(metrics_dict['val_loss'])}")
     print(f"Validation losses: {[x for x in metrics_dict['val_loss'] if not np.isnan(x)]}")
-    utils.plot_metrics(config['output_dir'], metrics_dict)
+
+    # Get model directory name from output_dir
+    model_dir = os.path.basename(config["output_dir"])
+
+    # Plot the metrics with all information
+    utils.plot_metrics(
+        config['output_dir'], 
+        metrics_dict,
+        model_dir=model_dir,
+        comment=config.get('comment')
+    )
 
     return best_value
 

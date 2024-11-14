@@ -1,0 +1,12 @@
+{
+    "train_indices": [
+        0,
+        1,
+        2
+    ],
+    "val_indices": [
+        0,
+        1
+    ],
+    "test_indices": []
+}
