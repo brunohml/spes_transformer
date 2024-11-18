@@ -4,6 +4,7 @@ from multiprocessing import Pool, cpu_count
 import glob
 import re
 import logging
+import pickle
 from itertools import repeat, chain
 
 import numpy as np
@@ -542,8 +543,125 @@ class SPESData(BaseData):
             print(f"Sanity check failed for sample {sample_id}: {str(e)}")
             return False
 
+class DynamicSPESData(BaseData):
+    """
+    Dynamic version of SPESData that loads individual examples from pickle files
+    instead of loading the entire dataset at once. Randomly subselects 36 channels
+    for each training example.
+    """
+    def __init__(self, data_dir, pattern='train', **kwargs):
+        if pattern == 'train':
+            self.data_dir = data_dir
+        elif pattern == 'test':
+            self.data_dir = os.path.join(data_dir, 'test_pickles')
+        
+        # Initialize logger
+        self.logger = logging.getLogger('__main__')
+        
+        # Get all patient directories
+        self.patient_dirs = [d for d in os.listdir(self.data_dir) if os.path.isdir(os.path.join(self.data_dir, d))]
+        logger.info(f"Found {len(self.patient_dirs)} patient directories in {self.data_dir}")
+
+        # Get all pickle files for all patients matching, index files for later referencing
+        self.all_IDs = []
+        self.file_paths = []
+
+        for patient in self.patient_dirs:
+            patient_path = os.path.join(self.data_dir, patient)
+            pickle_files = [f for f in os.listdir(patient_path) if f.endswith('.pickle')]
+            logger.info(f"Found {len(pickle_files)} pickle files in {patient_path}")
+            self.file_paths.extend([os.path.join(patient, f) for f in pickle_files])
+        
+        self.all_IDs = list(range(len(self.file_paths)))
+        logger.info(f"Total pickle files found: {len(self.file_paths)}")
+
+        # Initialize other attributes that will be set when loading examples
+        self.feature_names = [f'channel_{i}' for i in range(36)]
+        self.feature_df = pd.DataFrame(np.zeros((487, 36)), columns=self.feature_names) # model factory uses feature_df shape during model initialization
+        self.n_channels = 36
+        self.train_df = None
+        self.val_df = None
+        self.test_df = None
+
+    def load_example(self, idx):
+        """Load a single example from pickle file"""
+        file_path = os.path.join(self.data_dir, self.file_paths[idx])
+        # self.logger.info(f"\n=== Detailed Loading for {file_path} ===")
+        
+        with open(file_path, 'rb') as f:
+            example_data = pickle.load(f)
+            
+        # Get response matrices, channel names, and distances
+        response_matrices = example_data[0].T  # Transpose to get (487, n_channels)
+        channel_names = example_data[4]
+        channel_distances = example_data[5]
+        
+        # self.logger.info(f"Raw response matrix shape for {file_path}: {response_matrices.shape}")
+        
+        # Set sequence length from data
+        self.seq_len = response_matrices.shape[0]
+        # self.logger.info(f"Sequence length set to: {self.seq_len}")
+        
+        # Randomly select 36 channels
+        total_channels = len(channel_names)
+        selected_indices = np.random.choice(total_channels, size=36, replace=False)
+        
+        # Get selected data
+        selected_channels = [channel_names[i] for i in selected_indices]
+        selected_channel_distances = [channel_distances[i] for i in selected_indices]
+        
+        # Sort channels by distance
+        channel_indices = list(range(36))
+        sorted_indices = sorted(channel_indices, key=lambda x: selected_channel_distances[x])
+        
+        # Convert to DataFrame with only channel data
+        sequence_data = []
+        for t in range(self.seq_len):
+            row_data = {}  # No sequence_idx
+            # Add channel data for selected channels in sorted order
+            for new_idx, old_idx in enumerate(sorted_indices):
+                orig_ch_idx = selected_indices[old_idx]
+                row_data[f'channel_{new_idx}'] = response_matrices[t, orig_ch_idx]
+                
+            sequence_data.append(row_data)
+            
+        # Create DataFrame for this example
+        example_id = os.path.splitext(os.path.basename(file_path))[0]
+        self.all_df = pd.DataFrame(sequence_data)
+        self.all_df.index = [example_id] * self.seq_len
+
+        # Store selected channel information (for reference if needed)
+        self.selected_channels = {
+            f'channel_{new_idx}': {
+                'name': selected_channels[old_idx],
+                'distance': channel_distances[selected_indices[old_idx]]
+            } for new_idx, old_idx in enumerate(sorted_indices)
+        }
+        
+        # Add logging to verify structure
+        channel_cols = [col for col in self.all_df.columns if col.startswith('channel_')]
+        # self.logger.info(f"Number of channel columns: {len(channel_cols)}")
+        # self.logger.info(f"Final DataFrame shape for {file_path}: {self.all_df.shape}")  # Should be (487, 36) - just channels
+        # self.logger.info("=== End Loading ===\n")
+        
+        return self.all_df
+        
+    def __len__(self):
+        return len(self.all_IDs)
+        
+    def __getitem__(self, idx):
+        """Get a single example by index"""
+        df = self.load_example(idx)
+        return df
+        
+    def get_channel_info(self):
+        """Return information about currently selected channels"""
+        if not hasattr(self, 'selected_channels'):
+            raise RuntimeError("No channels selected yet. Load an example first.")
+        return self.selected_channels
 
 data_factory = {'weld': WeldData,
                 'tsra': TSRegressionArchive,
                 'pmu': PMUData,
-                'spes': SPESData}
+                'spes': SPESData,
+                'dynamic_spes': DynamicSPESData}

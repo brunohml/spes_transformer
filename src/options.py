@@ -19,6 +19,8 @@ class Options(object):
                                  help='Root output directory. Must exist. Time-stamped directories will be created inside.')
         self.parser.add_argument('--data_dir', default='./data',
                                  help='Data directory')
+        self.parser.add_argument('--val_data_dir', default='./data',
+                                 help='Validation data directory')
         self.parser.add_argument('--load_model',
                                  help='Path to pre-trained model.')
         self.parser.add_argument('--resume', action='store_true',
@@ -83,7 +85,7 @@ class Options(object):
         self.parser.add_argument('--subsample_factor', type=int,
                                  help='Sub-sampling factor used for long sequences: keep every kth sample')
         # Training process
-        self.parser.add_argument('--task', choices={"imputation", "transduction", "classification", "regression"},
+        self.parser.add_argument('--task', choices={"imputation", "transduction", "classification", "regression", "dynamic_imputation"},
                                  default="imputation",
                                  help=("Training objective/task: imputation of masked values,\n"
                                        "                          transduction of features to other features,\n"

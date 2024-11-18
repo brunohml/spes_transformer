@@ -47,6 +47,66 @@ class ImputationDataset(Dataset):
         return len(self.IDs)
 
 
+class DynamicImputationDataset(Dataset):
+    """Dynamically computes missingness (noise) mask for each sample, compatible with DynamicSPESData"""
+
+    def __init__(self, data, indices, mean_mask_length=3, masking_ratio=0.15,
+                 mode='separate', distribution='geometric', exclude_feats=None):
+        super(DynamicImputationDataset, self).__init__()
+
+        self.data = data  # this is a subclass of the BaseData class in data.py
+        self.IDs = indices  # list of data IDs, but also mapping between integer index and ID
+
+        self.masking_ratio = masking_ratio
+        self.mean_mask_length = mean_mask_length
+        self.mode = mode
+        self.distribution = distribution
+        self.exclude_feats = exclude_feats
+
+        self.logger = logging.getLogger('__main__')
+
+        # Add counter for batch logging
+        self.sample_counter = 0
+
+    def __getitem__(self, ind):
+        """
+        For a given integer index, returns the corresponding (seq_length, feat_dim) array and a noise mask of same shape
+        Args:
+            ind: integer index of sample in dataset
+        Returns:
+            X: (seq_length, feat_dim) tensor of the multivariate time series corresponding to a sample
+            mask: (seq_length, feat_dim) boolean tensor: 0s mask and predict, 1s: unaffected input
+            ID: ID of sample
+        """
+        df = self.data.load_example(self.IDs[ind])
+        
+        # Only select the channel response columns
+        channel_cols = [col for col in df.columns if col.startswith('channel_')]
+        X = df[channel_cols].values  # (seq_length, 36) array
+        
+        # Create mask
+        mask = noise_mask(X, self.masking_ratio, self.mean_mask_length, self.mode, self.distribution,
+                         self.exclude_feats)
+        
+        # Add batch shape logging every 100 samples
+        # self.sample_counter += 1
+        # if self.sample_counter % 1000 == 0:
+        #     self.logger.info(f"\n=== Sample Shape Check (ind={ind}) ===")
+        #     self.logger.info(f"Sample shape: {X.shape} (timesteps, channels)")
+        #     self.logger.info(f"Expected shape: (487, 36)")
+        #     self.logger.info(f"Mask shape: {mask.shape}")
+        #     self.logger.info(f"Source file: {self.data.file_paths[self.IDs[ind]]}")
+        #     self.logger.info("=== End Sample Check ===\n")
+
+        return torch.from_numpy(X), torch.from_numpy(mask), self.IDs[ind]
+
+    def update(self):
+        self.mean_mask_length = min(20, self.mean_mask_length + 1)
+        self.masking_ratio = min(1, self.masking_ratio + 0.05)
+
+    def __len__(self):
+        return len(self.IDs)
+
 class TransductionDataset(Dataset):
 
     def __init__(self, data, indices, mask_feats, start_hint=0.0, end_hint=0.0):
@@ -319,6 +379,10 @@ def collate_unsuperv(data, max_len=None, mask_compensation=False):
 
     padding_masks = padding_mask(torch.tensor(lengths, dtype=torch.int16), max_len=max_len)  # (batch_size, padded_length) boolean tensor, "1" means keep
     target_masks = ~target_masks  # inverse logic: 0 now means ignore, 1 means predict
+    
+    # logger = logging.getLogger('__main__')
+    # logger.info(f"Collated batch shape: {X.shape} (batch_size, padded_length, feat_dim)")
+    
     return X, targets, target_masks, padding_masks, IDs
 
 

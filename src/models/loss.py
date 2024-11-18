@@ -7,7 +7,7 @@ def get_loss_module(config):
 
     task = config['task']
 
-    if (task == "imputation") or (task == "transduction"):
+    if (task == "imputation") or (task == "transduction") or (task == "dynamic_imputation"):
         return MaskedMSELoss(reduction='none')  # outputs loss for each batch element
 
     if task == "classification":

@@ -20,7 +20,7 @@ import sklearn
 from utils import utils
 from utils.analysis import Analyzer
 from models.loss import l2_reg_loss
-from datasets.dataset import ImputationDataset, TransductionDataset, ClassiregressionDataset, collate_unsuperv, collate_superv
+from datasets.dataset import ImputationDataset, DynamicImputationDataset, TransductionDataset, ClassiregressionDataset, collate_unsuperv, collate_superv
 from utils.sampler import create_balanced_sampler
 from utils.utils import calculate_epoch_balance
 
@@ -45,6 +45,15 @@ def pipeline_factory(config):
                               mode=config.get('mask_mode', 'random'),
                               distribution=config.get('mask_distribution', 'geometric'),
                               exclude_feats=config.get('exclude_feats', None))
+        collate_fn = collate_unsuperv
+        runner_class = UnsupervisedRunner
+    elif task == "dynamic_imputation": # added this for compatibility with DynamicSPESData
+        dataset_class = partial(DynamicImputationDataset,
+                                mean_mask_length=config.get('mean_mask_length', 10),
+                                masking_ratio=config.get('masking_ratio', 0.15),
+                                mode=config.get('mask_mode', 'random'),
+                                distribution=config.get('mask_distribution', 'geometric'),
+                                exclude_feats=config.get('exclude_feats', None))
         collate_fn = collate_unsuperv
         runner_class = UnsupervisedRunner
     elif (task == "classification") or (task == "regression"):

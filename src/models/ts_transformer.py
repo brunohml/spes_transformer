@@ -19,7 +19,7 @@ def model_factory(config, data):
             print("Data class does not define a maximum sequence length, so it must be defined with the script argument `max_seq_len`")
             raise x
 
-    if (task == "imputation") or (task == "transduction"):
+    if (task == "imputation") or (task == "transduction") or (task == "dynamic_imputation"):
         if config['model'] == 'LINEAR':
             return DummyTSTransformerEncoder(feat_dim, max_seq_len, config['d_model'], config['num_heads'],
                                              config['num_layers'], config['dim_feedforward'], dropout=config['dropout'],
@@ -172,17 +172,21 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
 
     def forward(self, src: Tensor, src_mask: Optional[Tensor] = None,
                 src_key_padding_mask: Optional[Tensor] = None, **kwargs) -> Tensor:
-        """Pass the input through the encoder layer.
+        r"""Pass the input through the encoder layer.
+
         Args:
             src: the sequence to the encoder layer (required).
             src_mask: the mask for the src sequence (optional).
             src_key_padding_mask: the mask for the src keys per batch (optional).
-            **kwargs: Catches additional arguments like is_causal that might be passed from newer PyTorch versions
+
+        Shape:
+            see the docs in Transformer class.
         """
         src2 = self.self_attn(src, src, src, attn_mask=src_mask,
                               key_padding_mask=src_key_padding_mask)[0]
         src = src + self.dropout1(src2)  # (seq_len, batch_size, d_model)
         src = src.permute(1, 2, 0)  # (batch_size, d_model, seq_len)
+        # src = src.reshape([src.shape[0], -1])  # (batch_size, seq_length * d_model)
         src = self.norm1(src)
         src = src.permute(2, 0, 1)  # restore (seq_len, batch_size, d_model)
         src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
@@ -246,7 +250,7 @@ class TSTransformerEncoder(nn.Module):
         
         # Rest of forward pass remains the same
         inp = self.pos_enc(inp)
-        output = self.transformer_encoder(inp, src_key_padding_mask=~padding_masks)
+        output = self.transformer_encoder(inp, src_key_padding_mask=~padding_masks, )
         output = self.act(output)
         output = output.permute(1, 0, 2)
         output = self.dropout1(output)
@@ -255,7 +259,7 @@ class TSTransformerEncoder(nn.Module):
         return output
 
 
-class TSTransformerEncoderClassiregressor(nn.Module):
+class TSTransformerEncoderClassiregressor(nn.Module): # TODO: implement conv projection layer
     """
     Simplest classifier/regressor. Can be either regressor or classifier because the output does not include
     softmax. Concatenates final layer embeddings and uses 0s to ignore padding embeddings in final output layer.
@@ -321,7 +325,7 @@ class TSTransformerEncoderClassiregressor(nn.Module):
         return output
 
 
-class ProjectionLayer(nn.Module):
+class ProjectionLayer(nn.Module): # added this to switch between linear and conv1d projections
     def __init__(self, feat_dim, d_model, projection_type='linear', kernel_width=3, conv_stride=1):
         super(ProjectionLayer, self).__init__()
         self.projection_type = projection_type

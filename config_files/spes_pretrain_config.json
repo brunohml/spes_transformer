@@ -1,11 +1,13 @@
 {
-    "data_class": "spes",
-    "data_dir": "classification_datasets/SPES/soz_0.3",
-    "output_dir": "output/spes/pretrained",
-    "records_file": "imputation_records.xls",
+    "data_class": "dynamic_spes",
+    "data_dir": "spes_trial_pickles",
+    "val_data_dir": "spes_trial_pickles/val_pickles",
+    "output_dir": "spes_output/pretrained",
+    "records_file": "master_rercords/imputation_records.xls",
     "model": "transformer",
-    "task": "imputation",
-
+    "task": "dynamic_imputation",
+    "test_patient": "Epat38",
+    "pattern": "train",
 
     "batch_size": 32,
     "max_seq_len": 487,
@@ -27,8 +29,6 @@
     "num_workers": 4,
     "print_interval": 10,
     "val_ratio": 0,
-    "pattern": "TRAIN",
-    "val_pattern": "TEST",
     "early_stopping_patience": 10,
     "early_stopping_delta": 0.01,
 
