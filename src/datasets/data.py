@@ -573,7 +573,7 @@ class DynamicSPESData(BaseData):
             self.file_paths.extend([os.path.join(patient, f) for f in pickle_files])
         
         self.all_IDs = list(range(len(self.file_paths)))
-        logger.info(f"Total pickle files found: {len(self.file_paths)}")
+        logger.info(f"Total pickle files found: {len(self.all_IDs)}")
 
         # Initialize other attributes that will be set when loading examples
         self.feature_names = [f'channel_{i}' for i in range(36)]
@@ -583,10 +583,24 @@ class DynamicSPESData(BaseData):
         self.val_df = None
         self.test_df = None
 
+        # Load and cache SOZ labels for classification task
+        all_labels_df = pd.read_csv('spes_trial_metadata/labels_SOZ.csv')
+        
+        # Create mapping of patient_stim_pair -> SOZ label
+        self.labels_cache = {}
+        for _, row in all_labels_df.iterrows():
+            # Clean up the Lead string by removing spaces around hyphen
+            lead = row['Lead'].replace(' ', '')  # Remove all spaces
+            
+            # Convert Pt and Lead to match pickle file format (e.g., "Epat26_LA1-LA2")
+            key = f"{row['Pt']}_{lead}"
+            self.labels_cache[key] = row['SOZ']
+            
+        logger.info(f"Loaded {len(self.labels_cache)} SOZ labels")
+
     def load_example(self, idx):
         """Load a single example from pickle file"""
         file_path = os.path.join(self.data_dir, self.file_paths[idx])
-        # self.logger.info(f"\n=== Detailed Loading for {file_path} ===")
         
         with open(file_path, 'rb') as f:
             example_data = pickle.load(f)
@@ -659,6 +673,29 @@ class DynamicSPESData(BaseData):
         if not hasattr(self, 'selected_channels'):
             raise RuntimeError("No channels selected yet. Load an example first.")
         return self.selected_channels
+
+    def get_label(self, file_path):
+        """Extract label for a given pickle file"""
+        # Extract patient and stim pair from filename
+        # Example: spes_trial_pickles/Epat26_LA1-LA2_3mA_pulse_1.pickle
+        filename = os.path.basename(file_path)
+        pat_stim = '_'.join(filename.split('_')[:2])  # Gets "Epat26_LA1-LA2"
+        
+        if pat_stim not in self.labels_cache:
+            raise KeyError(f"No SOZ label found for {pat_stim}")
+            
+        return self.labels_cache[pat_stim]
+
+    @property
+    def class_names(self):
+        """Return class names for classification"""
+        return ['non-SOZ', 'SOZ']  # Binary classification
+        
+    @property
+    def labels(self):
+        """Return all labels (used by TimeSeriesDataset)"""
+        # Since we're loading dynamically, we'll need to get labels for all files
+        return np.array([self.get_label(fp) for fp in self.file_paths])
 
 data_factory = {'weld': WeldData,
                 'tsra': TSRegressionArchive,

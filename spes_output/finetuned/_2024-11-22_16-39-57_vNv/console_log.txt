@@ -1,0 +1,174 @@
+2024-11-22 16:39:57,587 | INFO : Using device: cuda
+2024-11-22 16:39:57,587 | INFO : Found 24 patient directories in spes_trial_pickles
+2024-11-22 16:39:57,587 | INFO : Found 530 pickle files in spes_trial_pickles/Epat26
+2024-11-22 16:39:57,588 | INFO : Found 340 pickle files in spes_trial_pickles/Epat35
+2024-11-22 16:39:57,588 | INFO : Found 584 pickle files in spes_trial_pickles/Spat48
+2024-11-22 16:39:57,588 | INFO : Found 549 pickle files in spes_trial_pickles/Spat50
+2024-11-22 16:39:57,588 | INFO : Found 370 pickle files in spes_trial_pickles/Spat31
+2024-11-22 16:39:57,589 | INFO : Found 500 pickle files in spes_trial_pickles/Spat37
+2024-11-22 16:39:57,589 | INFO : Found 480 pickle files in spes_trial_pickles/Spat55
+2024-11-22 16:39:57,589 | INFO : Found 420 pickle files in spes_trial_pickles/Spat42
+2024-11-22 16:39:57,590 | INFO : Found 458 pickle files in spes_trial_pickles/Spat53
+2024-11-22 16:39:57,590 | INFO : Found 611 pickle files in spes_trial_pickles/Epat37
+2024-11-22 16:39:57,590 | INFO : Found 460 pickle files in spes_trial_pickles/Epat30
+2024-11-22 16:39:57,590 | INFO : Found 450 pickle files in spes_trial_pickles/Spat41
+2024-11-22 16:39:57,591 | INFO : Found 542 pickle files in spes_trial_pickles/Spat52
+2024-11-22 16:39:57,591 | INFO : Found 458 pickle files in spes_trial_pickles/Epat43
+2024-11-22 16:39:57,591 | INFO : Found 371 pickle files in spes_trial_pickles/Spat49
+2024-11-22 16:39:57,592 | INFO : Found 559 pickle files in spes_trial_pickles/Epat34
+2024-11-22 16:39:57,592 | INFO : Found 500 pickle files in spes_trial_pickles/Spat44
+2024-11-22 16:39:57,592 | INFO : Found 280 pickle files in spes_trial_pickles/Epat31
+2024-11-22 16:39:57,592 | INFO : Found 0 pickle files in spes_trial_pickles/val_pickles
+2024-11-22 16:39:57,592 | INFO : Found 580 pickle files in spes_trial_pickles/Spat30
+2024-11-22 16:39:57,593 | INFO : Found 485 pickle files in spes_trial_pickles/Epat27
+2024-11-22 16:39:57,593 | INFO : Found 370 pickle files in spes_trial_pickles/Epat39
+2024-11-22 16:39:57,593 | INFO : Found 450 pickle files in spes_trial_pickles/Spat36
+2024-11-22 16:39:57,594 | INFO : Found 419 pickle files in spes_trial_pickles/Spat34
+2024-11-22 16:39:57,594 | INFO : Total pickle files found: 10766
+2024-11-22 16:39:57,711 | INFO : Loaded 7053 SOZ labels
+2024-11-22 16:39:57,711 | INFO : Found 1 patient directories in spes_trial_pickles/val_pickles
+2024-11-22 16:39:57,711 | INFO : Found 690 pickle files in spes_trial_pickles/val_pickles/Epat38
+2024-11-22 16:39:57,712 | INFO : Total pickle files found: 690
+2024-11-22 16:39:57,826 | INFO : Loaded 7053 SOZ labels
+2024-11-22 16:39:57,827 | INFO : Training data has 10766 examples available
+2024-11-22 16:39:57,827 | INFO : Validation data has 690 examples available
+2024-11-22 16:39:57,827 | INFO : Creating model ...
+2024-11-22 16:39:57,832 | INFO : Model:
+TSTransformerEncoderClassiregressor(
+  (project_inp): Linear(in_features=36, out_features=128, bias=True)
+  (pos_enc): LearnablePositionalEncoding(
+    (dropout): Dropout(p=0.1, inplace=False)
+  )
+  (transformer_encoder): TransformerEncoder(
+    (layers): ModuleList(
+      (0-3): 4 x TransformerBatchNormEncoderLayer(
+        (self_attn): MultiheadAttention(
+          (out_proj): NonDynamicallyQuantizableLinear(in_features=128, out_features=128, bias=True)
+        )
+        (linear1): Linear(in_features=128, out_features=256, bias=True)
+        (dropout): Dropout(p=0.1, inplace=False)
+        (linear2): Linear(in_features=256, out_features=128, bias=True)
+        (norm1): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (norm2): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (dropout1): Dropout(p=0.1, inplace=False)
+        (dropout2): Dropout(p=0.1, inplace=False)
+      )
+    )
+  )
+  (dropout1): Dropout(p=0.1, inplace=False)
+  (output_layer): Linear(in_features=62336, out_features=2, bias=True)
+)
+2024-11-22 16:39:57,832 | INFO : Total number of parameters: 721666
+2024-11-22 16:39:57,832 | INFO : Trainable parameters: 721666
+2024-11-22 16:39:58,191 | INFO : Evaluating on validation set ...
+2024-11-22 16:39:59,585 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.393599510192871 seconds
+
+2024-11-22 16:39:59,585 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.393599510192871 seconds
+2024-11-22 16:39:59,585 | INFO : Avg batch val. time: 0.06334543228149414 seconds
+2024-11-22 16:39:59,585 | INFO : Avg sample val. time: 0.002019709435062132 seconds
+2024-11-22 16:39:59,585 | INFO : Epoch 0 Validation Summary: epoch: 0.000000 | loss: 3.085237 | accuracy: 0.107246 | precision: 0.783485 | AUROC: 0.494683 | AUPRC: 0.086939 | 
+2024-11-22 16:39:59,592 | INFO : Starting training ...
+2024-11-22 16:40:16,591 | INFO : Epoch 1 SOZ sampling ratio: 15.39%
+2024-11-22 16:40:16,591 | INFO : Epoch 1 Training Summary: epoch: 1.0000 loss: 1.5135 soz_ratio: 0.1539 
+2024-11-22 16:40:16,591 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:40:16,591 | INFO : Evaluating on validation set ...
+2024-11-22 16:40:17,864 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.273191213607788 seconds
+
+2024-11-22 16:40:17,864 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.3333953619003296 seconds
+2024-11-22 16:40:17,864 | INFO : Avg batch val. time: 0.060608880086378616 seconds
+2024-11-22 16:40:17,864 | INFO : Avg sample val. time: 0.0019324570462323617 seconds
+2024-11-22 16:40:17,865 | INFO : Epoch 1 Validation Summary: epoch: 1.000000 | loss: 1.112747 | accuracy: 0.913043 | precision: 0.913043 | AUROC: 0.433915 | AUPRC: 0.070897 | 
+2024-11-22 16:40:35,008 | INFO : Epoch 2 SOZ sampling ratio: 15.39%
+2024-11-22 16:40:35,008 | INFO : Epoch 2 Training Summary: epoch: 2.0000 loss: 1.4594 soz_ratio: 0.1539 
+2024-11-22 16:40:35,008 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:40:35,008 | INFO : Evaluating on validation set ...
+2024-11-22 16:40:36,284 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.2755141258239746 seconds
+
+2024-11-22 16:40:36,284 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.3141016165415447 seconds
+2024-11-22 16:40:36,284 | INFO : Avg batch val. time: 0.0597318916609793 seconds
+2024-11-22 16:40:36,284 | INFO : Avg sample val. time: 0.0019044950964370213 seconds
+2024-11-22 16:40:36,284 | INFO : Epoch 2 Validation Summary: epoch: 2.000000 | loss: 1.115874 | accuracy: 0.913043 | precision: 0.913043 | AUROC: 0.495741 | AUPRC: 0.094871 | 
+2024-11-22 16:40:53,971 | INFO : Epoch 3 SOZ sampling ratio: 15.39%
+2024-11-22 16:40:53,971 | INFO : Epoch 3 Training Summary: epoch: 3.0000 loss: 1.4437 soz_ratio: 0.1539 
+2024-11-22 16:40:53,971 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:41:11,181 | INFO : Epoch 4 SOZ sampling ratio: 15.39%
+2024-11-22 16:41:11,182 | INFO : Epoch 4 Training Summary: epoch: 4.0000 loss: 1.4418 soz_ratio: 0.1539 
+2024-11-22 16:41:11,182 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:41:11,182 | INFO : Evaluating on validation set ...
+2024-11-22 16:41:12,460 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.2786757946014404 seconds
+
+2024-11-22 16:41:12,460 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.3052451610565186 seconds
+2024-11-22 16:41:12,460 | INFO : Avg batch val. time: 0.05932932550256902 seconds
+2024-11-22 16:41:12,461 | INFO : Avg sample val. time: 0.0018916596537050993 seconds
+2024-11-22 16:41:12,461 | INFO : Epoch 4 Validation Summary: epoch: 4.000000 | loss: 1.071710 | accuracy: 0.913043 | precision: 0.913043 | AUROC: 0.454894 | AUPRC: 0.078767 | 
+2024-11-22 16:41:29,737 | INFO : Epoch 5 SOZ sampling ratio: 15.39%
+2024-11-22 16:41:29,738 | INFO : Epoch 5 Training Summary: epoch: 5.0000 loss: 1.4308 soz_ratio: 0.1539 
+2024-11-22 16:41:29,738 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:41:46,982 | INFO : Epoch 6 SOZ sampling ratio: 15.39%
+2024-11-22 16:41:46,982 | INFO : Epoch 6 Training Summary: epoch: 6.0000 loss: 1.4245 soz_ratio: 0.1539 
+2024-11-22 16:41:46,982 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:41:46,982 | INFO : Evaluating on validation set ...
+2024-11-22 16:41:48,217 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.2346880435943604 seconds
+
+2024-11-22 16:41:48,217 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.291133737564087 seconds
+2024-11-22 16:41:48,217 | INFO : Avg batch val. time: 0.058687897162003955 seconds
+2024-11-22 16:41:48,217 | INFO : Avg sample val. time: 0.001871208315310271 seconds
+2024-11-22 16:41:48,218 | INFO : Epoch 6 Validation Summary: epoch: 6.000000 | loss: 1.107095 | accuracy: 0.913043 | precision: 0.913043 | AUROC: 0.453492 | AUPRC: 0.083933 | 
+2024-11-22 16:42:05,365 | INFO : Epoch 7 SOZ sampling ratio: 15.39%
+2024-11-22 16:42:05,365 | INFO : Epoch 7 Training Summary: epoch: 7.0000 loss: 1.4240 soz_ratio: 0.1539 
+2024-11-22 16:42:05,365 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:42:22,700 | INFO : Epoch 8 SOZ sampling ratio: 15.39%
+2024-11-22 16:42:22,701 | INFO : Epoch 8 Training Summary: epoch: 8.0000 loss: 1.4237 soz_ratio: 0.1539 
+2024-11-22 16:42:22,701 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:42:22,701 | INFO : Evaluating on validation set ...
+2024-11-22 16:42:24,008 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.3068962097167969 seconds
+
+2024-11-22 16:42:24,008 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.2937608162562053 seconds
+2024-11-22 16:42:24,008 | INFO : Avg batch val. time: 0.058807309829827514 seconds
+2024-11-22 16:42:24,008 | INFO : Avg sample val. time: 0.0018750156757336308 seconds
+2024-11-22 16:42:24,008 | INFO : Epoch 8 Validation Summary: epoch: 8.000000 | loss: 1.072243 | accuracy: 0.913043 | precision: 0.913043 | AUROC: 0.463280 | AUPRC: 0.079872 | 
+2024-11-22 16:42:41,308 | INFO : Epoch 9 SOZ sampling ratio: 15.39%
+2024-11-22 16:42:41,309 | INFO : Epoch 9 Training Summary: epoch: 9.0000 loss: 1.4160 soz_ratio: 0.1539 
+2024-11-22 16:42:41,309 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:42:58,709 | INFO : Epoch 10 SOZ sampling ratio: 15.39%
+2024-11-22 16:42:58,710 | INFO : Epoch 10 Training Summary: epoch: 10.0000 loss: 1.4148 soz_ratio: 0.1539 
+2024-11-22 16:42:58,710 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:42:58,710 | INFO : Evaluating on validation set ...
+2024-11-22 16:42:59,944 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.2339441776275635 seconds
+
+2024-11-22 16:42:59,944 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.2852155821663993 seconds
+2024-11-22 16:42:59,944 | INFO : Avg batch val. time: 0.058418890098472696 seconds
+2024-11-22 16:42:59,944 | INFO : Avg sample val. time: 0.0018626312785020279 seconds
+2024-11-22 16:42:59,944 | INFO : Epoch 10 Validation Summary: epoch: 10.000000 | loss: 1.095751 | accuracy: 0.913043 | precision: 0.913043 | AUROC: 0.515741 | AUPRC: 0.087306 | 
+2024-11-22 16:43:17,110 | INFO : Epoch 11 SOZ sampling ratio: 15.39%
+2024-11-22 16:43:17,110 | INFO : Epoch 11 Training Summary: epoch: 11.0000 loss: 1.4085 soz_ratio: 0.1539 
+2024-11-22 16:43:17,110 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:43:34,442 | INFO : Epoch 12 SOZ sampling ratio: 15.39%
+2024-11-22 16:43:34,442 | INFO : Epoch 12 Training Summary: epoch: 12.0000 loss: 1.4074 soz_ratio: 0.1539 
+2024-11-22 16:43:34,442 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:43:34,442 | INFO : Evaluating on validation set ...
+2024-11-22 16:43:35,674 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.2315161228179932 seconds
+
+2024-11-22 16:43:35,674 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.2785031497478485 seconds
+2024-11-22 16:43:35,674 | INFO : Avg batch val. time: 0.05811377953399311 seconds
+2024-11-22 16:43:35,674 | INFO : Avg sample val. time: 0.001852903115576592 seconds
+2024-11-22 16:43:35,675 | INFO : Epoch 12 Validation Summary: epoch: 12.000000 | loss: 1.079645 | accuracy: 0.913043 | precision: 0.913043 | AUROC: 0.469180 | AUPRC: 0.085363 | 
+2024-11-22 16:43:52,845 | INFO : Epoch 13 SOZ sampling ratio: 15.39%
+2024-11-22 16:43:52,845 | INFO : Epoch 13 Training Summary: epoch: 13.0000 loss: 1.3966 soz_ratio: 0.1539 
+2024-11-22 16:43:52,846 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:44:10,052 | INFO : Epoch 14 SOZ sampling ratio: 15.39%
+2024-11-22 16:44:10,052 | INFO : Epoch 14 Training Summary: epoch: 14.0000 loss: 1.4021 soz_ratio: 0.1539 
+2024-11-22 16:44:10,052 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:44:10,052 | INFO : Evaluating on validation set ...
+2024-11-22 16:44:11,292 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.2395069599151611 seconds
+
+2024-11-22 16:44:11,292 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.2741702397664387 seconds
+2024-11-22 16:44:11,292 | INFO : Avg batch val. time: 0.05791682908029267 seconds
+2024-11-22 16:44:11,292 | INFO : Avg sample val. time: 0.0018466235358933895 seconds
+2024-11-22 16:44:11,292 | INFO : Epoch 14 Validation Summary: epoch: 14.000000 | loss: 1.156244 | accuracy: 0.913043 | precision: 0.913043 | AUROC: 0.443148 | AUPRC: 0.075524 | 
+2024-11-22 16:44:11,293 | INFO : Early stopping triggered - training stopped
+2024-11-22 16:44:11,296 | INFO : Best accuracy was 0.9130434782608695. Other metrics: {'epoch': 1, 'loss': 1.1127474466959635, 'accuracy': 0.9130434782608695, 'precision': 0.9130434782608695, 'AUROC': 0.4339153439153439, 'AUPRC': 0.07089702777872274}
+2024-11-22 16:44:11,296 | INFO : All Done!
+2024-11-22 16:44:11,296 | INFO : Total runtime: 0.0 hours, 4.0 minutes, 13.813950538635254 seconds
+
+2024-11-22 16:44:11,673 | INFO : Training completed.

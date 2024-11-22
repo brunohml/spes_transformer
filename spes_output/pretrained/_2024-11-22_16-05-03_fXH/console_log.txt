@@ -1,0 +1,110 @@
+2024-11-22 16:05:03,486 | INFO : Using device: cuda
+2024-11-22 16:05:03,486 | INFO : Found 24 patient directories in spes_trial_pickles
+2024-11-22 16:05:03,486 | INFO : Found 530 pickle files in spes_trial_pickles/Epat26
+2024-11-22 16:05:03,486 | INFO : Found 340 pickle files in spes_trial_pickles/Epat35
+2024-11-22 16:05:03,487 | INFO : Found 584 pickle files in spes_trial_pickles/Spat48
+2024-11-22 16:05:03,487 | INFO : Found 549 pickle files in spes_trial_pickles/Spat50
+2024-11-22 16:05:03,487 | INFO : Found 370 pickle files in spes_trial_pickles/Spat31
+2024-11-22 16:05:03,487 | INFO : Found 500 pickle files in spes_trial_pickles/Spat37
+2024-11-22 16:05:03,488 | INFO : Found 480 pickle files in spes_trial_pickles/Spat55
+2024-11-22 16:05:03,488 | INFO : Found 420 pickle files in spes_trial_pickles/Spat42
+2024-11-22 16:05:03,488 | INFO : Found 458 pickle files in spes_trial_pickles/Spat53
+2024-11-22 16:05:03,489 | INFO : Found 611 pickle files in spes_trial_pickles/Epat37
+2024-11-22 16:05:03,489 | INFO : Found 460 pickle files in spes_trial_pickles/Epat30
+2024-11-22 16:05:03,489 | INFO : Found 450 pickle files in spes_trial_pickles/Spat41
+2024-11-22 16:05:03,490 | INFO : Found 542 pickle files in spes_trial_pickles/Spat52
+2024-11-22 16:05:03,490 | INFO : Found 458 pickle files in spes_trial_pickles/Epat43
+2024-11-22 16:05:03,490 | INFO : Found 371 pickle files in spes_trial_pickles/Spat49
+2024-11-22 16:05:03,490 | INFO : Found 559 pickle files in spes_trial_pickles/Epat34
+2024-11-22 16:05:03,491 | INFO : Found 500 pickle files in spes_trial_pickles/Spat44
+2024-11-22 16:05:03,491 | INFO : Found 280 pickle files in spes_trial_pickles/Epat31
+2024-11-22 16:05:03,491 | INFO : Found 0 pickle files in spes_trial_pickles/val_pickles
+2024-11-22 16:05:03,491 | INFO : Found 580 pickle files in spes_trial_pickles/Spat30
+2024-11-22 16:05:03,492 | INFO : Found 485 pickle files in spes_trial_pickles/Epat27
+2024-11-22 16:05:03,492 | INFO : Found 370 pickle files in spes_trial_pickles/Epat39
+2024-11-22 16:05:03,492 | INFO : Found 450 pickle files in spes_trial_pickles/Spat36
+2024-11-22 16:05:03,492 | INFO : Found 419 pickle files in spes_trial_pickles/Spat34
+2024-11-22 16:05:03,493 | INFO : Total pickle files found: 10766
+2024-11-22 16:05:03,493 | INFO : Found 1 patient directories in spes_trial_pickles/val_pickles
+2024-11-22 16:05:03,493 | INFO : Found 690 pickle files in spes_trial_pickles/val_pickles/Epat38
+2024-11-22 16:05:03,493 | INFO : Total pickle files found: 690
+2024-11-22 16:05:03,493 | INFO : Training data has 10766 examples available
+2024-11-22 16:05:03,493 | INFO : Validation data has 690 examples available
+2024-11-22 16:05:03,493 | INFO : Creating model ...
+2024-11-22 16:05:03,499 | INFO : Model:
+TSTransformerEncoder(
+  (project_inp): ProjectionLayer(
+    (projection): Conv1d(36, 128, kernel_size=(15,), stride=(1,), padding=(7,))
+  )
+  (pos_enc): LearnablePositionalEncoding(
+    (dropout): Dropout(p=0.1, inplace=False)
+  )
+  (transformer_encoder): TransformerEncoder(
+    (layers): ModuleList(
+      (0-3): 4 x TransformerBatchNormEncoderLayer(
+        (self_attn): MultiheadAttention(
+          (out_proj): NonDynamicallyQuantizableLinear(in_features=128, out_features=128, bias=True)
+        )
+        (linear1): Linear(in_features=128, out_features=256, bias=True)
+        (dropout): Dropout(p=0.1, inplace=False)
+        (linear2): Linear(in_features=256, out_features=128, bias=True)
+        (norm1): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (norm2): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (dropout1): Dropout(p=0.1, inplace=False)
+        (dropout2): Dropout(p=0.1, inplace=False)
+      )
+    )
+  )
+  (output_layer): Linear(in_features=128, out_features=36, bias=True)
+  (dropout1): Dropout(p=0.1, inplace=False)
+)
+2024-11-22 16:05:03,499 | INFO : Total number of parameters: 666148
+2024-11-22 16:05:03,499 | INFO : Trainable parameters: 666148
+2024-11-22 16:05:03,860 | INFO : Evaluating on validation set ...
+2024-11-22 16:05:05,636 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.776418924331665 seconds
+
+2024-11-22 16:05:05,637 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.776418924331665 seconds
+2024-11-22 16:05:05,637 | INFO : Avg batch val. time: 0.0807463147423484 seconds
+2024-11-22 16:05:05,637 | INFO : Avg sample val. time: 0.0025745201801908187 seconds
+2024-11-22 16:05:05,637 | INFO : Epoch 0 Validation Summary: epoch: 0.000000 | loss: 0.745891 | recon_acc: 0.029540 | 
+2024-11-22 16:05:05,720 | INFO : Starting training ...
+2024-11-22 16:05:29,992 | INFO : Epoch 1 Training Summary: epoch: 1.0000 loss: 0.1558 
+2024-11-22 16:05:29,992 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:05:29,992 | INFO : Evaluating on validation set ...
+2024-11-22 16:05:31,772 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7794315814971924 seconds
+
+2024-11-22 16:05:31,772 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7779252529144287 seconds
+2024-11-22 16:05:31,772 | INFO : Avg batch val. time: 0.08081478422338312 seconds
+2024-11-22 16:05:31,772 | INFO : Avg sample val. time: 0.002576703265093375 seconds
+2024-11-22 16:05:31,772 | INFO : Epoch 1 Validation Summary: epoch: 1.000000 | loss: 0.098545 | recon_acc: 0.063959 | 
+2024-11-22 16:05:56,242 | INFO : Epoch 2 Training Summary: epoch: 2.0000 loss: 0.1030 
+2024-11-22 16:05:56,242 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:05:56,242 | INFO : Evaluating on validation set ...
+2024-11-22 16:05:57,995 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7523534297943115 seconds
+
+2024-11-22 16:05:57,995 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7694013118743896 seconds
+2024-11-22 16:05:57,995 | INFO : Avg batch val. time: 0.0804273323579268 seconds
+2024-11-22 16:05:57,995 | INFO : Avg sample val. time: 0.002564349727354188 seconds
+2024-11-22 16:05:57,996 | INFO : Epoch 2 Validation Summary: epoch: 2.000000 | loss: 0.068048 | recon_acc: 0.072043 | 
+2024-11-22 16:06:22,345 | INFO : Epoch 3 Training Summary: epoch: 3.0000 loss: 0.0712 
+2024-11-22 16:06:22,345 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:06:46,602 | INFO : Epoch 4 Training Summary: epoch: 4.0000 loss: 0.0543 
+2024-11-22 16:06:46,602 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:06:46,602 | INFO : Evaluating on validation set ...
+2024-11-22 16:06:48,344 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7418289184570312 seconds
+
+2024-11-22 16:06:48,344 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.76250821352005 seconds
+2024-11-22 16:06:48,344 | INFO : Avg batch val. time: 0.08011400970545682 seconds
+2024-11-22 16:06:48,344 | INFO : Avg sample val. time: 0.002554359729739203 seconds
+2024-11-22 16:06:48,344 | INFO : Epoch 4 Validation Summary: epoch: 4.000000 | loss: 0.043453 | recon_acc: 0.047423 | 
+2024-11-22 16:07:12,819 | INFO : Epoch 5 Training Summary: epoch: 5.0000 loss: 0.0501 
+2024-11-22 16:07:12,819 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:07:37,104 | INFO : Epoch 6 Training Summary: epoch: 6.0000 loss: 0.0472 
+2024-11-22 16:07:37,105 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 16:07:37,105 | INFO : Evaluating on validation set ...
+2024-11-22 16:07:38,858 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7531530857086182 seconds
+
+2024-11-22 16:07:38,858 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7606371879577636 seconds
+2024-11-22 16:07:38,858 | INFO : Avg batch val. time: 0.08002896308898926 seconds
+2024-11-22 16:07:38,858 | INFO : Avg sample val. time: 0.0025516480984895122 seconds
+2024-11-22 16:07:38,858 | INFO : Epoch 6 Validation Summary: epoch: 6.000000 | loss: 0.039715 | recon_acc: 0.054486 | 

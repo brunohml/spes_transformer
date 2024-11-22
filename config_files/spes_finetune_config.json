@@ -1,33 +1,35 @@
 {
-    "data_class": "spes",
-    "data_dir": "classification_datasets/SPES/soz_0.3",
+    "data_class": "dynamic_spes",
+    "data_dir": "spes_trial_pickles",
+    "val_data_dir": "spes_trial_pickles/val_pickles",
     "output_dir": "spes_output/finetuned",
-    "load_model": "spes_output/pretrained/_2024-11-13_18-58-04_MXq/checkpoints/model_best.pth",
-    "records_file": "classification_records.xls",
+    "records_file": "master_records/classification_records.xls",
+    "load_model": "spes_output/pretrained/_2024-11-18_15-39-51_jaj/checkpoints/model_best.pth",
     "model": "transformer",
-    "task": "classification",
+    "task": "dynamic_classification",
+    "change_output": true,
     "key_metric": "accuracy",
+    "val_ratio": 0,
+    "pattern": "train",
+    "test_patient": "Epat38",
     "print_interval": 5,
 
 
     "batch_size": 32,
     "max_seq_len": 487,
-    "d_model": 256,
+    "d_model": 128,
     "num_heads": 8,
     "num_layers": 4,
-    "dim_feedforward": 512,
-    "dropout": 0.2,
+    "dim_feedforward": 256,
+    "dropout": 0.1,
     "pos_encoding": "learnable",
 
     "activation": "gelu",
-    "normalization": "per_sample_std",
-    "lr": 0.00001,
+    "normalization": "preproc_normalized",
+    "lr": 1e-5,
     "epochs": 100,
     "optimizer": "Adam",
     "num_workers": 4,
-    "val_ratio": 0,
-    "pattern": "TRAIN",
-    "val_pattern": "TEST",
     "early_stopping_patience": 5,
     "early_stopping_delta": 0.01,
 
@@ -35,7 +37,6 @@
     "pos_weight": 3.0,
     "num_classes": 2,
     "use_balanced_sampling": false,
-    "freeze": true,
-    "change_output": true
+    "freeze": false
 
 } 

@@ -34,8 +34,8 @@ def model_factory(config, data):
                                         kernel_width=config['kernel_width'],
                                         conv_stride=config['conv_stride'])
 
-    if (task == "classification") or (task == "regression"):
-        num_labels = len(data.class_names) if task == "classification" else data.labels_df.shape[1]  # dimensionality of labels
+    if (task == "classification") or (task == "regression") or (task == "dynamic_classification"):
+        num_labels = len(data.class_names) if (task == "classification") or (task == "dynamic_classification") else data.labels_df.shape[1]  # dimensionality of labels
         if config['model'] == 'LINEAR':
             return DummyTSTransformerEncoderClassiregressor(feat_dim, max_seq_len, config['d_model'],
                                                             config['num_heads'],

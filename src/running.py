@@ -20,7 +20,7 @@ import sklearn
 from utils import utils
 from utils.analysis import Analyzer
 from models.loss import l2_reg_loss
-from datasets.dataset import ImputationDataset, DynamicImputationDataset, TransductionDataset, ClassiregressionDataset, collate_unsuperv, collate_superv
+from datasets.dataset import ImputationDataset, DynamicImputationDataset, DynamicClassDataset, ClassiregressionDataset, collate_unsuperv, collate_superv
 from utils.sampler import create_balanced_sampler
 from utils.utils import calculate_epoch_balance
 
@@ -56,6 +56,10 @@ def pipeline_factory(config):
                                 exclude_feats=config.get('exclude_feats', None))
         collate_fn = collate_unsuperv
         runner_class = UnsupervisedRunner
+    elif task == "dynamic_classification": # added this for compatibility with DynamicSPESData
+        dataset_class = DynamicClassDataset
+        collate_fn = collate_superv
+        runner_class = SupervisedRunner
     elif (task == "classification") or (task == "regression"):
         dataset_class = ClassiregressionDataset
         collate_fn = collate_superv
@@ -407,7 +411,9 @@ class UnsupervisedRunner(BaseRunner):
                 # Calculate reconstruction accuracy
                 masked_pred = torch.masked_select(predictions, target_masks)
                 masked_true = torch.masked_select(targets, target_masks)
-                batch_recon_acc = torch.mean((torch.abs(masked_pred - masked_true) < 0.4).float())
+                batch_recon_acc = torch.mean((torch.abs(masked_pred - masked_true) < 0.25).float())
+                # relative_error = torch.abs(masked_pred - masked_true) / (torch.abs(masked_true) + 1e-8)  # add small epsilon to avoid division by zero
+                # batch_recon_acc = torch.mean((relative_error < 0.2).float())  # 20% relative error threshold
 
                 if keep_all:
                     per_batch['target_masks'].append(target_masks.cpu().numpy())

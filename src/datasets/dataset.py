@@ -3,6 +3,7 @@ from torch.utils.data import Dataset
 import torch
 import random
 import logging
+import os
 
 
 class ImputationDataset(Dataset):
@@ -32,12 +33,27 @@ class ImputationDataset(Dataset):
             mask: (seq_length, feat_dim) boolean tensor: 0s mask and predict, 1s: unaffected input
             ID: ID of sample
         """
-
-        X = self.feature_df.loc[self.IDs[ind]].values  # (seq_length, feat_dim) array
-        mask = noise_mask(X, self.masking_ratio, self.mean_mask_length, self.mode, self.distribution,
-                          self.exclude_feats)  # (seq_length, feat_dim) boolean array
-
-        return torch.from_numpy(X), torch.from_numpy(mask), self.IDs[ind]
+        ID = self.IDs[ind]
+        
+        logger = logging.getLogger('__main__')
+        # Debug logging
+        logger.debug(f"Dataset accessing index {ind} (ID: {ID})")
+        
+        # Load data through the data object
+        df = self.data.load_example(ind)
+        
+        # Verify data was loaded
+        logger.debug(f"Loaded data shape: {df.shape}")
+        
+        # Only select the channel response columns
+        channel_cols = [col for col in df.columns if col.startswith('channel_')]
+        X = df[channel_cols].values
+        
+        # Create mask
+        mask = noise_mask(X, self.masking_ratio, self.mean_mask_length, 
+                         self.mode, self.distribution, self.exclude_feats)
+        
+        return torch.from_numpy(X), torch.from_numpy(mask), ID
 
     def update(self):
         self.mean_mask_length = min(20, self.mean_mask_length + 1)
@@ -63,11 +79,6 @@ class DynamicImputationDataset(Dataset):
         self.distribution = distribution
         self.exclude_feats = exclude_feats
 
-        self.logger = logging.getLogger('__main__')
-
-        # Add counter for batch logging
-        self.sample_counter = 0
-
     def __getitem__(self, ind):
         """
         For a given integer index, returns the corresponding (seq_length, feat_dim) array and a noise mask of same shape
@@ -78,7 +89,9 @@ class DynamicImputationDataset(Dataset):
             mask: (seq_length, feat_dim) boolean tensor: 0s mask and predict, 1s: unaffected input
             ID: ID of sample
         """
-        df = self.data.load_example(self.IDs[ind])
+        ID = self.IDs[ind]
+        
+        df = self.data.load_example(ID)
         
         # Only select the channel response columns
         channel_cols = [col for col in df.columns if col.startswith('channel_')]
@@ -87,16 +100,6 @@ class DynamicImputationDataset(Dataset):
         # Create mask
         mask = noise_mask(X, self.masking_ratio, self.mean_mask_length, self.mode, self.distribution,
                          self.exclude_feats)
-        
-        # Add batch shape logging every 100 samples
-        # self.sample_counter += 1
-        # if self.sample_counter % 1000 == 0:
-        #     self.logger.info(f"\n=== Sample Shape Check (ind={ind}) ===")
-        #     self.logger.info(f"Sample shape: {X.shape} (timesteps, channels)")
-        #     self.logger.info(f"Expected shape: (487, 36)")
-        #     self.logger.info(f"Mask shape: {mask.shape}")
-        #     self.logger.info(f"Source file: {self.data.file_paths[self.IDs[ind]]}")
-        #     self.logger.info("=== End Sample Check ===\n")
 
         return torch.from_numpy(X), torch.from_numpy(mask), self.IDs[ind]
 
@@ -501,3 +504,89 @@ class TimeSeriesDataset(Dataset):
 
     def __len__(self):
         return len(self.all_IDs)
+
+
+class DynamicClassDataset(Dataset):
+    """Dataset for classification tasks with DynamicSPESData"""
+    
+    def __init__(self, data, indices):
+        super(DynamicClassDataset, self).__init__()
+        
+        self.data = data
+        self.IDs = indices
+        
+        # Initialize integrity check tracking
+        self.integrity_checks = {
+            'total_checks': 0,
+            'passed_checks': 0,
+            'failed_samples': set()
+        }
+        
+        self.logger = logging.getLogger('__main__')
+        
+    def verify_example(self, df, file_path):
+        """Verify data structure of loaded example"""
+        try:
+            # 1. Check sequence length
+            assert len(df) == 487, f"Expected 487 timepoints, got {len(df)}"
+            
+            # 2. Check channel structure
+            channel_cols = [f"channel_{i}" for i in range(36)]
+            assert all(col in df.columns for col in channel_cols), "Missing expected channel columns"
+            assert len(df.columns) == 36, f"Expected 36 channels, got {len(df.columns)}"
+            
+            # 3. Check data validity
+            assert not df.isna().any().any(), "Sample contains NaN values"
+            
+            # 4. Verify label exists
+            pat_stim = '_'.join(os.path.basename(file_path).split('_')[:2])
+            assert pat_stim in self.data.labels_cache, f"No label found for {pat_stim}"
+            
+            return True
+            
+        except AssertionError as e:
+            self.logger.error(
+                f"\n{'='*50}"
+                f"\nDATA INTEGRITY CHECK FAILED"
+                f"\nFile: {file_path}"
+                f"\nError: {str(e)}"
+                f"\nShape: {df.shape}"
+                f"\nColumns: {df.columns.tolist()}"
+                f"\n{'='*50}"
+            )
+            return False
+
+    def __getitem__(self, ind):
+        """Get a single training example"""
+        file_path = self.data.file_paths[self.IDs[ind]]
+        
+        # Load data
+        df = self.data.load_example(self.IDs[ind])
+        
+        # Verify data integrity
+        if self.integrity_checks['total_checks'] == 0 or random.random() < 0.01:
+            self.integrity_checks['total_checks'] += 1
+            if self.verify_example(df, file_path):
+                self.integrity_checks['passed_checks'] += 1
+            else:
+                self.integrity_checks['failed_samples'].add(file_path)
+                raise RuntimeError(f"Training example {file_path} is corrupted")
+            
+            # Log milestone checks
+            if self.integrity_checks['total_checks'] % 100 == 0:
+                self.logger.info(
+                    f"\nData Integrity Check Milestone:"
+                    f"\n- Total checks: {self.integrity_checks['total_checks']}"
+                    f"\n- Passed checks: {self.integrity_checks['passed_checks']}"
+                    f"\n- Failed samples: {len(self.integrity_checks['failed_samples'])}"
+                    f"\n- Pass rate: {(self.integrity_checks['passed_checks']/self.integrity_checks['total_checks'])*100:.2f}%"
+                )
+        
+        # Get features and label
+        X = df[sorted([col for col in df.columns if col.startswith('channel_')])].values
+        y = np.array([self.data.get_label(file_path)])
+        
+        return torch.from_numpy(X), torch.from_numpy(y), self.IDs[ind]
+
+    def __len__(self):
+        return len(self.IDs)

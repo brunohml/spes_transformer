@@ -10,7 +10,7 @@ def get_loss_module(config):
     if (task == "imputation") or (task == "transduction") or (task == "dynamic_imputation"):
         return MaskedMSELoss(reduction='none')  # outputs loss for each batch element
 
-    if task == "classification":
+    if (task == "classification") or (task == "dynamic_classification"):
         if config.get('num_classes', 2) == 2:  # Binary classification
             pos_weight = torch.tensor([config.get('pos_weight', 4.0)])
             return WeightedBCEWithLogitsLoss(pos_weight=pos_weight, reduction='none')

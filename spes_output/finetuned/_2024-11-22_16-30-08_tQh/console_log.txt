@@ -1,0 +1,35 @@
+2024-11-22 16:30:08,630 | INFO : Using device: cuda
+2024-11-22 16:30:08,631 | INFO : Found 24 patient directories in spes_trial_pickles
+2024-11-22 16:30:08,631 | INFO : Found 530 pickle files in spes_trial_pickles/Epat26
+2024-11-22 16:30:08,631 | INFO : Found 340 pickle files in spes_trial_pickles/Epat35
+2024-11-22 16:30:08,631 | INFO : Found 584 pickle files in spes_trial_pickles/Spat48
+2024-11-22 16:30:08,632 | INFO : Found 549 pickle files in spes_trial_pickles/Spat50
+2024-11-22 16:30:08,632 | INFO : Found 370 pickle files in spes_trial_pickles/Spat31
+2024-11-22 16:30:08,632 | INFO : Found 500 pickle files in spes_trial_pickles/Spat37
+2024-11-22 16:30:08,633 | INFO : Found 480 pickle files in spes_trial_pickles/Spat55
+2024-11-22 16:30:08,633 | INFO : Found 420 pickle files in spes_trial_pickles/Spat42
+2024-11-22 16:30:08,633 | INFO : Found 458 pickle files in spes_trial_pickles/Spat53
+2024-11-22 16:30:08,633 | INFO : Found 611 pickle files in spes_trial_pickles/Epat37
+2024-11-22 16:30:08,634 | INFO : Found 460 pickle files in spes_trial_pickles/Epat30
+2024-11-22 16:30:08,634 | INFO : Found 450 pickle files in spes_trial_pickles/Spat41
+2024-11-22 16:30:08,634 | INFO : Found 542 pickle files in spes_trial_pickles/Spat52
+2024-11-22 16:30:08,635 | INFO : Found 458 pickle files in spes_trial_pickles/Epat43
+2024-11-22 16:30:08,635 | INFO : Found 371 pickle files in spes_trial_pickles/Spat49
+2024-11-22 16:30:08,635 | INFO : Found 559 pickle files in spes_trial_pickles/Epat34
+2024-11-22 16:30:08,635 | INFO : Found 500 pickle files in spes_trial_pickles/Spat44
+2024-11-22 16:30:08,636 | INFO : Found 280 pickle files in spes_trial_pickles/Epat31
+2024-11-22 16:30:08,636 | INFO : Found 0 pickle files in spes_trial_pickles/val_pickles
+2024-11-22 16:30:08,636 | INFO : Found 580 pickle files in spes_trial_pickles/Spat30
+2024-11-22 16:30:08,636 | INFO : Found 485 pickle files in spes_trial_pickles/Epat27
+2024-11-22 16:30:08,637 | INFO : Found 370 pickle files in spes_trial_pickles/Epat39
+2024-11-22 16:30:08,637 | INFO : Found 450 pickle files in spes_trial_pickles/Spat36
+2024-11-22 16:30:08,637 | INFO : Found 419 pickle files in spes_trial_pickles/Spat34
+2024-11-22 16:30:08,637 | INFO : Total pickle files found: 10766
+2024-11-22 16:30:08,753 | INFO : Loaded 7053 SOZ labels
+2024-11-22 16:30:08,753 | INFO : Found 1 patient directories in spes_trial_pickles/val_pickles
+2024-11-22 16:30:08,753 | INFO : Found 690 pickle files in spes_trial_pickles/val_pickles/Epat38
+2024-11-22 16:30:08,754 | INFO : Total pickle files found: 690
+2024-11-22 16:30:08,868 | INFO : Loaded 7053 SOZ labels
+2024-11-22 16:30:08,868 | INFO : Training data has 10766 examples available
+2024-11-22 16:30:08,868 | INFO : Validation data has 690 examples available
+2024-11-22 16:30:08,868 | INFO : Creating model ...
