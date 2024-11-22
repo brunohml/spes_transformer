@@ -295,8 +295,9 @@ def main(config):
     if config['task'] == 'imputation' or config['task'] == 'dynamic_imputation':
         logger.info('Training completed. Running visualization script...')
         
-        # Construct path to model directory
+        # Construct paths
         model_path = Path(config['output_dir'])
+        vis_output_path = model_path / 'imputation_results.png'
         
         # Get path to visualization script relative to dynamic_main.py
         vis_script_path = Path(__file__).parent.parent / 'visualize_imputation.py'
@@ -306,9 +307,10 @@ def main(config):
             subprocess.run([
                 sys.executable,  # Current Python interpreter
                 str(vis_script_path),
-                '--model_path', str(model_path)
+                '--model_path', str(model_path),
+                '--output_path', str(vis_output_path)
             ], check=True)
-            logger.info(f'Visualization saved to {model_path}/imputation_vis.png')
+            logger.info(f'Visualization saved to {vis_output_path}')
         except subprocess.CalledProcessError as e:
             logger.error(f'Visualization script failed with error: {e}')
         except Exception as e:

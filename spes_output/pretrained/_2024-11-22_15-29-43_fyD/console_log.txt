@@ -1,0 +1,260 @@
+2024-11-22 15:29:44,030 | INFO : Using device: cuda
+2024-11-22 15:29:44,030 | INFO : Found 24 patient directories in spes_trial_pickles
+2024-11-22 15:29:44,031 | INFO : Found 530 pickle files in spes_trial_pickles/Epat26
+2024-11-22 15:29:44,031 | INFO : Found 340 pickle files in spes_trial_pickles/Epat35
+2024-11-22 15:29:44,031 | INFO : Found 584 pickle files in spes_trial_pickles/Spat48
+2024-11-22 15:29:44,031 | INFO : Found 549 pickle files in spes_trial_pickles/Spat50
+2024-11-22 15:29:44,032 | INFO : Found 370 pickle files in spes_trial_pickles/Spat31
+2024-11-22 15:29:44,032 | INFO : Found 500 pickle files in spes_trial_pickles/Spat37
+2024-11-22 15:29:44,032 | INFO : Found 480 pickle files in spes_trial_pickles/Spat55
+2024-11-22 15:29:44,033 | INFO : Found 420 pickle files in spes_trial_pickles/Spat42
+2024-11-22 15:29:44,033 | INFO : Found 458 pickle files in spes_trial_pickles/Spat53
+2024-11-22 15:29:44,033 | INFO : Found 611 pickle files in spes_trial_pickles/Epat37
+2024-11-22 15:29:44,033 | INFO : Found 460 pickle files in spes_trial_pickles/Epat30
+2024-11-22 15:29:44,034 | INFO : Found 450 pickle files in spes_trial_pickles/Spat41
+2024-11-22 15:29:44,034 | INFO : Found 542 pickle files in spes_trial_pickles/Spat52
+2024-11-22 15:29:44,034 | INFO : Found 458 pickle files in spes_trial_pickles/Epat43
+2024-11-22 15:29:44,035 | INFO : Found 371 pickle files in spes_trial_pickles/Spat49
+2024-11-22 15:29:44,035 | INFO : Found 559 pickle files in spes_trial_pickles/Epat34
+2024-11-22 15:29:44,035 | INFO : Found 500 pickle files in spes_trial_pickles/Spat44
+2024-11-22 15:29:44,035 | INFO : Found 280 pickle files in spes_trial_pickles/Epat31
+2024-11-22 15:29:44,036 | INFO : Found 0 pickle files in spes_trial_pickles/val_pickles
+2024-11-22 15:29:44,036 | INFO : Found 580 pickle files in spes_trial_pickles/Spat30
+2024-11-22 15:29:44,036 | INFO : Found 485 pickle files in spes_trial_pickles/Epat27
+2024-11-22 15:29:44,036 | INFO : Found 370 pickle files in spes_trial_pickles/Epat39
+2024-11-22 15:29:44,037 | INFO : Found 450 pickle files in spes_trial_pickles/Spat36
+2024-11-22 15:29:44,037 | INFO : Found 419 pickle files in spes_trial_pickles/Spat34
+2024-11-22 15:29:44,037 | INFO : Total pickle files found: 10766
+2024-11-22 15:29:44,037 | INFO : Found 1 patient directories in spes_trial_pickles/val_pickles
+2024-11-22 15:29:44,038 | INFO : Found 690 pickle files in spes_trial_pickles/val_pickles/Epat38
+2024-11-22 15:29:44,038 | INFO : Total pickle files found: 690
+2024-11-22 15:29:44,038 | INFO : Training data has 10766 examples available
+2024-11-22 15:29:44,038 | INFO : Validation data has 690 examples available
+2024-11-22 15:29:44,038 | INFO : Creating model ...
+2024-11-22 15:29:44,043 | INFO : Model:
+TSTransformerEncoder(
+  (project_inp): ProjectionLayer(
+    (projection): Conv1d(36, 128, kernel_size=(15,), stride=(1,), padding=(7,))
+  )
+  (pos_enc): LearnablePositionalEncoding(
+    (dropout): Dropout(p=0.1, inplace=False)
+  )
+  (transformer_encoder): TransformerEncoder(
+    (layers): ModuleList(
+      (0-3): 4 x TransformerBatchNormEncoderLayer(
+        (self_attn): MultiheadAttention(
+          (out_proj): NonDynamicallyQuantizableLinear(in_features=128, out_features=128, bias=True)
+        )
+        (linear1): Linear(in_features=128, out_features=256, bias=True)
+        (dropout): Dropout(p=0.1, inplace=False)
+        (linear2): Linear(in_features=256, out_features=128, bias=True)
+        (norm1): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (norm2): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (dropout1): Dropout(p=0.1, inplace=False)
+        (dropout2): Dropout(p=0.1, inplace=False)
+      )
+    )
+  )
+  (output_layer): Linear(in_features=128, out_features=36, bias=True)
+  (dropout1): Dropout(p=0.1, inplace=False)
+)
+2024-11-22 15:29:44,043 | INFO : Total number of parameters: 666148
+2024-11-22 15:29:44,043 | INFO : Trainable parameters: 666148
+2024-11-22 15:29:44,393 | INFO : Evaluating on validation set ...
+2024-11-22 15:29:46,155 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7620418071746826 seconds
+
+2024-11-22 15:29:46,155 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7620418071746826 seconds
+2024-11-22 15:29:46,155 | INFO : Avg batch val. time: 0.08009280941703102 seconds
+2024-11-22 15:29:46,155 | INFO : Avg sample val. time: 0.002553683778514033 seconds
+2024-11-22 15:29:46,155 | INFO : Epoch 0 Validation Summary: epoch: 0.000000 | loss: 0.752059 | recon_acc: 0.374217 | 
+2024-11-22 15:29:46,238 | INFO : Starting training ...
+2024-11-22 15:30:10,503 | INFO : Epoch 1 Training Summary: epoch: 1.0000 loss: 0.1525 
+2024-11-22 15:30:10,503 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:30:10,503 | INFO : Evaluating on validation set ...
+2024-11-22 15:30:12,259 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7554609775543213 seconds
+
+2024-11-22 15:30:12,259 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.758751392364502 seconds
+2024-11-22 15:30:12,259 | INFO : Avg batch val. time: 0.07994324510747736 seconds
+2024-11-22 15:30:12,259 | INFO : Avg sample val. time: 0.0025489150613978288 seconds
+2024-11-22 15:30:12,259 | INFO : Epoch 1 Validation Summary: epoch: 1.000000 | loss: 0.096208 | recon_acc: 0.818017 | 
+2024-11-22 15:30:36,576 | INFO : Epoch 2 Training Summary: epoch: 2.0000 loss: 0.1012 
+2024-11-22 15:30:36,577 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:30:36,577 | INFO : Evaluating on validation set ...
+2024-11-22 15:30:38,327 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7506639957427979 seconds
+
+2024-11-22 15:30:38,327 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7560555934906006 seconds
+2024-11-22 15:30:38,328 | INFO : Avg batch val. time: 0.0798207087950273 seconds
+2024-11-22 15:30:38,328 | INFO : Avg sample val. time: 0.0025450081065081166 seconds
+2024-11-22 15:30:38,328 | INFO : Epoch 2 Validation Summary: epoch: 2.000000 | loss: 0.067732 | recon_acc: 0.882920 | 
+2024-11-22 15:31:02,750 | INFO : Epoch 3 Training Summary: epoch: 3.0000 loss: 0.0716 
+2024-11-22 15:31:02,750 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:31:27,022 | INFO : Epoch 4 Training Summary: epoch: 4.0000 loss: 0.0494 
+2024-11-22 15:31:27,022 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:31:27,022 | INFO : Evaluating on validation set ...
+2024-11-22 15:31:28,792 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7695631980895996 seconds
+
+2024-11-22 15:31:28,792 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7594324946403503 seconds
+2024-11-22 15:31:28,792 | INFO : Avg batch val. time: 0.0799742043018341 seconds
+2024-11-22 15:31:28,792 | INFO : Avg sample val. time: 0.0025499021661454352 seconds
+2024-11-22 15:31:28,792 | INFO : Epoch 4 Validation Summary: epoch: 4.000000 | loss: 0.042688 | recon_acc: 0.938205 | 
+2024-11-22 15:31:53,173 | INFO : Epoch 5 Training Summary: epoch: 5.0000 loss: 0.0436 
+2024-11-22 15:31:53,173 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:32:17,436 | INFO : Epoch 6 Training Summary: epoch: 6.0000 loss: 0.0418 
+2024-11-22 15:32:17,436 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:32:17,436 | INFO : Evaluating on validation set ...
+2024-11-22 15:32:19,183 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7469110488891602 seconds
+
+2024-11-22 15:32:19,183 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7569282054901123 seconds
+2024-11-22 15:32:19,183 | INFO : Avg batch val. time: 0.07986037297682329 seconds
+2024-11-22 15:32:19,183 | INFO : Avg sample val. time: 0.002546272761579873 seconds
+2024-11-22 15:32:19,183 | INFO : Epoch 6 Validation Summary: epoch: 6.000000 | loss: 0.039126 | recon_acc: 0.945864 | 
+2024-11-22 15:32:43,555 | INFO : Epoch 7 Training Summary: epoch: 7.0000 loss: 0.0399 
+2024-11-22 15:32:43,555 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:33:07,751 | INFO : Epoch 8 Training Summary: epoch: 8.0000 loss: 0.0381 
+2024-11-22 15:33:07,751 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:33:07,751 | INFO : Evaluating on validation set ...
+2024-11-22 15:33:09,498 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7465169429779053 seconds
+
+2024-11-22 15:33:09,498 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7551929950714111 seconds
+2024-11-22 15:33:09,498 | INFO : Avg batch val. time: 0.07978149977597324 seconds
+2024-11-22 15:33:09,498 | INFO : Avg sample val. time: 0.0025437579638716104 seconds
+2024-11-22 15:33:09,498 | INFO : Epoch 8 Validation Summary: epoch: 8.000000 | loss: 0.035976 | recon_acc: 0.953171 | 
+2024-11-22 15:33:34,020 | INFO : Epoch 9 Training Summary: epoch: 9.0000 loss: 0.0363 
+2024-11-22 15:33:34,020 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:33:58,276 | INFO : Epoch 10 Training Summary: epoch: 10.0000 loss: 0.0346 
+2024-11-22 15:33:58,276 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:33:58,276 | INFO : Evaluating on validation set ...
+2024-11-22 15:34:00,039 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7621798515319824 seconds
+
+2024-11-22 15:34:00,039 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7561911174229212 seconds
+2024-11-22 15:34:00,039 | INFO : Avg batch val. time: 0.07982686897376914 seconds
+2024-11-22 15:34:00,039 | INFO : Avg sample val. time: 0.002545204518004234 seconds
+2024-11-22 15:34:00,039 | INFO : Epoch 10 Validation Summary: epoch: 10.000000 | loss: 0.033536 | recon_acc: 0.958061 | 
+2024-11-22 15:34:24,348 | INFO : Epoch 11 Training Summary: epoch: 11.0000 loss: 0.0330 
+2024-11-22 15:34:24,348 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:34:48,591 | INFO : Epoch 12 Training Summary: epoch: 12.0000 loss: 0.0317 
+2024-11-22 15:34:48,591 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:34:48,591 | INFO : Evaluating on validation set ...
+2024-11-22 15:34:50,342 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7512972354888916 seconds
+
+2024-11-22 15:34:50,342 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7555793821811676 seconds
+2024-11-22 15:34:50,342 | INFO : Avg batch val. time: 0.0797990628264167 seconds
+2024-11-22 15:34:50,342 | INFO : Avg sample val. time: 0.002544317945190098 seconds
+2024-11-22 15:34:50,342 | INFO : Epoch 12 Validation Summary: epoch: 12.000000 | loss: 0.030906 | recon_acc: 0.963655 | 
+2024-11-22 15:35:14,788 | INFO : Epoch 13 Training Summary: epoch: 13.0000 loss: 0.0305 
+2024-11-22 15:35:14,789 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:35:39,040 | INFO : Epoch 14 Training Summary: epoch: 14.0000 loss: 0.0296 
+2024-11-22 15:35:39,040 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:35:39,040 | INFO : Evaluating on validation set ...
+2024-11-22 15:35:40,780 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7393271923065186 seconds
+
+2024-11-22 15:35:40,780 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7537735833062067 seconds
+2024-11-22 15:35:40,780 | INFO : Avg batch val. time: 0.07971698105937303 seconds
+2024-11-22 15:35:40,780 | INFO : Avg sample val. time: 0.0025417008453713142 seconds
+2024-11-22 15:35:40,780 | INFO : Epoch 14 Validation Summary: epoch: 14.000000 | loss: 0.029798 | recon_acc: 0.965443 | 
+2024-11-22 15:36:05,172 | INFO : Epoch 15 Training Summary: epoch: 15.0000 loss: 0.0287 
+2024-11-22 15:36:05,172 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:36:29,464 | INFO : Epoch 16 Training Summary: epoch: 16.0000 loss: 0.0278 
+2024-11-22 15:36:29,464 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:36:29,464 | INFO : Evaluating on validation set ...
+2024-11-22 15:36:31,211 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7466049194335938 seconds
+
+2024-11-22 15:36:31,211 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7530567169189453 seconds
+2024-11-22 15:36:31,211 | INFO : Avg batch val. time: 0.07968439622358842 seconds
+2024-11-22 15:36:31,211 | INFO : Avg sample val. time: 0.0025406619085781815 seconds
+2024-11-22 15:36:31,211 | INFO : Epoch 16 Validation Summary: epoch: 16.000000 | loss: 0.028622 | recon_acc: 0.967470 | 
+2024-11-22 15:36:55,741 | INFO : Epoch 17 Training Summary: epoch: 17.0000 loss: 0.0273 
+2024-11-22 15:36:55,741 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:37:20,004 | INFO : Epoch 18 Training Summary: epoch: 18.0000 loss: 0.0267 
+2024-11-22 15:37:20,005 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:37:20,005 | INFO : Evaluating on validation set ...
+2024-11-22 15:37:21,763 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7579715251922607 seconds
+
+2024-11-22 15:37:21,763 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.753503517671065 seconds
+2024-11-22 15:37:21,763 | INFO : Avg batch val. time: 0.07970470534868478 seconds
+2024-11-22 15:37:21,763 | INFO : Avg sample val. time: 0.002541309445900094 seconds
+2024-11-22 15:37:21,763 | INFO : Epoch 18 Validation Summary: epoch: 18.000000 | loss: 0.027368 | recon_acc: 0.970060 | 
+2024-11-22 15:37:46,223 | INFO : Epoch 19 Training Summary: epoch: 19.0000 loss: 0.0261 
+2024-11-22 15:37:46,224 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:38:10,412 | INFO : Epoch 20 Training Summary: epoch: 20.0000 loss: 0.0258 
+2024-11-22 15:38:10,412 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:38:10,412 | INFO : Evaluating on validation set ...
+2024-11-22 15:38:12,164 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7515575885772705 seconds
+
+2024-11-22 15:38:12,164 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7533413569132488 seconds
+2024-11-22 15:38:12,164 | INFO : Avg batch val. time: 0.07969733440514767 seconds
+2024-11-22 15:38:12,164 | INFO : Avg sample val. time: 0.002541074430309056 seconds
+2024-11-22 15:38:12,164 | INFO : Epoch 20 Validation Summary: epoch: 20.000000 | loss: 0.026765 | recon_acc: 0.971120 | 
+2024-11-22 15:38:36,635 | INFO : Epoch 21 Training Summary: epoch: 21.0000 loss: 0.0254 
+2024-11-22 15:38:36,635 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:39:00,868 | INFO : Epoch 22 Training Summary: epoch: 22.0000 loss: 0.0250 
+2024-11-22 15:39:00,869 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:39:00,869 | INFO : Evaluating on validation set ...
+2024-11-22 15:39:02,618 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7493515014648438 seconds
+
+2024-11-22 15:39:02,618 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7530344449556792 seconds
+2024-11-22 15:39:02,618 | INFO : Avg batch val. time: 0.07968338386162178 seconds
+2024-11-22 15:39:02,618 | INFO : Avg sample val. time: 0.0025406296303705496 seconds
+2024-11-22 15:39:02,618 | INFO : Epoch 22 Validation Summary: epoch: 22.000000 | loss: 0.026161 | recon_acc: 0.972068 | 
+2024-11-22 15:39:27,022 | INFO : Epoch 23 Training Summary: epoch: 23.0000 loss: 0.0246 
+2024-11-22 15:39:27,023 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:39:51,205 | INFO : Epoch 24 Training Summary: epoch: 24.0000 loss: 0.0244 
+2024-11-22 15:39:51,205 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:39:51,205 | INFO : Evaluating on validation set ...
+2024-11-22 15:39:52,951 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7459421157836914 seconds
+
+2024-11-22 15:39:52,951 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.752527850014823 seconds
+2024-11-22 15:39:52,951 | INFO : Avg batch val. time: 0.07966035681885558 seconds
+2024-11-22 15:39:52,951 | INFO : Avg sample val. time: 0.002539895434804091 seconds
+2024-11-22 15:39:52,952 | INFO : Epoch 24 Validation Summary: epoch: 24.000000 | loss: 0.025804 | recon_acc: 0.972896 | 
+2024-11-22 15:40:17,334 | INFO : Epoch 25 Training Summary: epoch: 25.0000 loss: 0.0242 
+2024-11-22 15:40:17,335 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:40:41,586 | INFO : Epoch 26 Training Summary: epoch: 26.0000 loss: 0.0239 
+2024-11-22 15:40:41,586 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:40:41,586 | INFO : Evaluating on validation set ...
+2024-11-22 15:40:43,335 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.748126745223999 seconds
+
+2024-11-22 15:40:43,335 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.752234443028768 seconds
+2024-11-22 15:40:43,335 | INFO : Avg batch val. time: 0.07964702013767128 seconds
+2024-11-22 15:40:43,335 | INFO : Avg sample val. time: 0.0025394702072880694 seconds
+2024-11-22 15:40:43,335 | INFO : Epoch 26 Validation Summary: epoch: 26.000000 | loss: 0.025827 | recon_acc: 0.972357 | 
+2024-11-22 15:41:07,603 | INFO : Epoch 27 Training Summary: epoch: 27.0000 loss: 0.0236 
+2024-11-22 15:41:07,604 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:41:32,004 | INFO : Epoch 28 Training Summary: epoch: 28.0000 loss: 0.0234 
+2024-11-22 15:41:32,004 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:41:32,004 | INFO : Evaluating on validation set ...
+2024-11-22 15:41:33,770 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7660269737243652 seconds
+
+2024-11-22 15:41:33,770 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7530964761972427 seconds
+2024-11-22 15:41:33,770 | INFO : Avg batch val. time: 0.07968620346351103 seconds
+2024-11-22 15:41:33,770 | INFO : Avg sample val. time: 0.002540719530720642 seconds
+2024-11-22 15:41:33,770 | INFO : Epoch 28 Validation Summary: epoch: 28.000000 | loss: 0.025212 | recon_acc: 0.973600 | 
+2024-11-22 15:41:58,132 | INFO : Epoch 29 Training Summary: epoch: 29.0000 loss: 0.0233 
+2024-11-22 15:41:58,132 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:42:22,300 | INFO : Epoch 30 Training Summary: epoch: 30.0000 loss: 0.0231 
+2024-11-22 15:42:22,300 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:42:22,300 | INFO : Evaluating on validation set ...
+2024-11-22 15:42:24,052 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.7515501976013184 seconds
+
+2024-11-22 15:42:24,052 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7530055186327766 seconds
+2024-11-22 15:42:24,052 | INFO : Avg batch val. time: 0.07968206902876257 seconds
+2024-11-22 15:42:24,052 | INFO : Avg sample val. time: 0.0025405877081634445 seconds
+2024-11-22 15:42:24,052 | INFO : Epoch 30 Validation Summary: epoch: 30.000000 | loss: 0.024785 | recon_acc: 0.974378 | 
+2024-11-22 15:42:48,520 | INFO : Epoch 31 Training Summary: epoch: 31.0000 loss: 0.0229 
+2024-11-22 15:42:48,520 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:43:12,670 | INFO : Epoch 32 Training Summary: epoch: 32.0000 loss: 0.0228 
+2024-11-22 15:43:12,670 | INFO : Epoch runtime: 0.0000 seconds
+2024-11-22 15:43:12,670 | INFO : Evaluating on validation set ...
+2024-11-22 15:43:14,432 | INFO : Validation runtime: 0.0 hours, 0.0 minutes, 1.76182222366333 seconds
+
+2024-11-22 15:43:14,432 | INFO : Avg val. time: 0.0 hours, 0.0 minutes, 1.7534953355789185 seconds
+2024-11-22 15:43:14,432 | INFO : Avg batch val. time: 0.07970433343540538 seconds
+2024-11-22 15:43:14,432 | INFO : Avg sample val. time: 0.002541297587795534 seconds
+2024-11-22 15:43:14,432 | INFO : Epoch 32 Validation Summary: epoch: 32.000000 | loss: 0.024643 | recon_acc: 0.974584 | 
+2024-11-22 15:43:14,574 | INFO : Early stopping triggered - training stopped
+2024-11-22 15:43:14,579 | INFO : Best loss was 0.024642509932750183. Other metrics: OrderedDict([('epoch', 32), ('loss', 0.024642509932750183), ('recon_acc', 0.9745840727847963)])
+2024-11-22 15:43:14,580 | INFO : All Done!
+2024-11-22 15:43:14,580 | INFO : Total runtime: 0.0 hours, 13.0 minutes, 30.656893014907837 seconds
+
+2024-11-22 15:43:15,023 | INFO : Training completed. Running visualization script...
+2024-11-22 15:43:18,061 | INFO : Visualization saved to spes_output/pretrained/_2024-11-22_15-29-43_fyD/imputation_vis.png
